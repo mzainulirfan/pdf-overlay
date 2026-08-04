@@ -1,0 +1,1274 @@
+# Product Requirements Document
+
+## Web PDF Overlay Editor
+
+**Versi:** 1.0
+**Status:** Draft MVP
+**Platform:** Web
+**Target perangkat:** Desktop/laptop
+**Target pengguna:** Pengguna yang ingin menambahkan tanda “FRAGILE” pada setiap halaman PDF sebelum dicetak
+
+---
+
+## 1. Ringkasan Produk
+
+Web PDF Overlay Editor adalah aplikasi berbasis web untuk membuka file PDF, menambahkan overlay berupa tulisan atau gambar, mengatur posisi overlay dengan drag-and-drop, lalu menyimpan kembali dokumen sebagai file PDF baru.
+
+Overlay yang diatur pengguna akan diterapkan secara otomatis ke seluruh halaman PDF.
+
+Contoh penggunaan utama:
+
+* Membuka file label atau resi dalam format PDF.
+* Menambahkan tulisan “FRAGILE”.
+* Menambahkan ikon barang pecah belah.
+* Mengatur posisi dan ukuran overlay.
+* Menerapkan overlay pada seluruh halaman.
+* Mengunduh PDF baru yang siap dicetak.
+
+Semua proses dilakukan langsung di browser. File tidak perlu diunggah ke server.
+
+---
+
+## 2. Latar Belakang
+
+Tidak semua label atau resi pengiriman memiliki tanda tambahan seperti:
+
+* FRAGILE
+* JANGAN DIBANTING
+* HANDLE WITH CARE
+* BARANG MUDAH PECAH
+
+Pengguna biasanya harus mengedit setiap halaman secara manual menggunakan aplikasi PDF editor atau aplikasi desain.
+
+Proses tersebut menjadi kurang efisien ketika satu file PDF memiliki banyak halaman.
+
+Aplikasi ini dibuat untuk menyederhanakan proses tersebut. Pengguna cukup mengatur overlay satu kali, kemudian aplikasi menerapkannya ke semua halaman PDF secara otomatis.
+
+---
+
+## 3. Tujuan Produk
+
+Tujuan utama aplikasi:
+
+1. Mempermudah pengguna membuka PDF langsung dari browser.
+2. Memungkinkan pengguna menambahkan overlay berupa teks atau gambar.
+3. Memungkinkan overlay dipindahkan menggunakan drag-and-drop.
+4. Memungkinkan overlay diperbesar atau diperkecil.
+5. Menerapkan overlay yang sama pada seluruh halaman PDF.
+6. Menghasilkan PDF baru tanpa mengubah file PDF asli.
+7. Menjaga dokumen tetap privat dengan memprosesnya di browser.
+
+---
+
+## 4. Sasaran Pengguna
+
+Aplikasi ini ditujukan untuk:
+
+* Penjual marketplace.
+* Pemilik toko online.
+* Admin gudang.
+* Staf packing.
+* Pengguna yang rutin mencetak label atau resi.
+* Pengguna yang membutuhkan watermark sederhana pada PDF.
+
+---
+
+## 5. Permasalahan Pengguna
+
+Permasalahan utama:
+
+* Resi tidak selalu memiliki tanda “FRAGILE”.
+* Pengguna harus menambahkan tulisan secara manual.
+* PDF dapat memiliki banyak halaman.
+* Mengedit setiap halaman membutuhkan waktu.
+* Aplikasi PDF editor biasanya memiliki terlalu banyak fitur.
+* Beberapa aplikasi PDF editor berbayar.
+* Pengguna mungkin tidak ingin mengunggah dokumen ke server pihak lain.
+
+---
+
+## 6. Solusi Produk
+
+Aplikasi menyediakan halaman editor sederhana dengan alur:
+
+```text
+Buka PDF
+    ↓
+PDF ditampilkan
+    ↓
+Tambahkan overlay
+    ↓
+Atur posisi dengan drag-and-drop
+    ↓
+Atur ukuran overlay
+    ↓
+Overlay diterapkan ke semua halaman
+    ↓
+Simpan sebagai PDF baru
+```
+
+Pengguna hanya perlu mengatur satu overlay. Posisi dan ukuran tersebut kemudian digunakan pada seluruh halaman PDF.
+
+---
+
+## 7. Ruang Lingkup MVP
+
+### 7.1 Fitur yang termasuk dalam MVP
+
+* Membuka file PDF dari perangkat.
+* Mendukung drag-and-drop file PDF ke halaman aplikasi.
+* Menampilkan preview PDF.
+* Menampilkan informasi jumlah halaman.
+* Navigasi halaman sebelumnya dan berikutnya.
+* Menambahkan overlay teks.
+* Menambahkan overlay gambar PNG atau JPG.
+* Memindahkan overlay dengan drag-and-drop.
+* Mengubah ukuran overlay dengan resize handle.
+* Mengatur transparansi overlay.
+* Menghapus overlay.
+* Mengembalikan posisi overlay ke posisi awal.
+* Menerapkan overlay ke seluruh halaman PDF.
+* Menyimpan hasil sebagai file PDF baru.
+* Memproses file langsung di browser.
+* Menampilkan loading selama proses export.
+
+### 7.2 Fitur yang tidak termasuk dalam MVP
+
+* Mengedit teks asli di dalam PDF.
+* Menghapus isi asli PDF.
+* Menggabungkan beberapa PDF.
+* Memisahkan halaman PDF.
+* Mengurutkan ulang halaman.
+* Menambahkan tanda tangan digital.
+* OCR untuk PDF hasil scan.
+* Akun pengguna.
+* Penyimpanan cloud.
+* Sinkronisasi antarperangkat.
+* Riwayat dokumen.
+* Kolaborasi.
+* Overlay berbeda untuk setiap halaman.
+* Banyak overlay dalam satu dokumen.
+* Undo dan redo.
+* Penyimpanan template online.
+
+---
+
+## 8. Asumsi MVP
+
+Untuk menjaga implementasi tetap sederhana, MVP menggunakan asumsi berikut:
+
+* Satu dokumen hanya memiliki satu overlay aktif.
+* Overlay selalu diterapkan ke semua halaman.
+* Pengguna menggunakan browser desktop.
+* PDF diproses secara lokal di browser.
+* File asli tidak dimodifikasi.
+* Hasil export selalu menjadi file PDF baru.
+* Overlay gambar menggunakan format PNG atau JPG.
+* PDF tidak memiliki password.
+* Ukuran file maksimal ditentukan sesuai kemampuan browser.
+
+Rekomendasi batas awal:
+
+```text
+Maksimal ukuran PDF: 25 MB
+Maksimal jumlah halaman: 100 halaman
+```
+
+Batas tersebut dapat diubah setelah pengujian performa.
+
+---
+
+## 9. User Flow Utama
+
+### 9.1 Membuka PDF
+
+1. Pengguna membuka aplikasi.
+2. Pengguna melihat area upload.
+3. Pengguna menekan tombol **Pilih PDF** atau melakukan drag-and-drop.
+4. Aplikasi memeriksa file.
+5. Jika file valid, aplikasi menampilkan halaman editor.
+6. Halaman pertama PDF ditampilkan.
+
+### 9.2 Menambahkan overlay teks
+
+1. Pengguna menekan tombol **Tambah Teks**.
+2. Overlay teks muncul di tengah halaman.
+3. Nilai default overlay adalah “FRAGILE”.
+4. Pengguna dapat mengganti isi teks.
+5. Pengguna memindahkan overlay dengan drag-and-drop.
+6. Pengguna mengubah ukuran overlay.
+7. Perubahan berlaku untuk seluruh halaman.
+
+### 9.3 Menambahkan overlay gambar
+
+1. Pengguna menekan tombol **Tambah Gambar**.
+2. Pengguna memilih file PNG atau JPG.
+3. Gambar muncul sebagai overlay.
+4. Pengguna mengatur posisi dan ukuran gambar.
+5. Overlay gambar diterapkan ke semua halaman.
+
+### 9.4 Menyimpan PDF
+
+1. Pengguna menekan tombol **Simpan PDF**.
+2. Aplikasi menampilkan status pemrosesan.
+3. Aplikasi membuka PDF asli.
+4. Aplikasi menambahkan overlay ke setiap halaman.
+5. Aplikasi membuat PDF baru.
+6. Browser mengunduh file hasil.
+7. File asli tetap tidak berubah.
+
+---
+
+## 10. Struktur Halaman
+
+Aplikasi terdiri dari dua kondisi halaman utama.
+
+### 10.1 Halaman awal
+
+Komponen:
+
+* Nama aplikasi.
+* Deskripsi singkat.
+* Area drag-and-drop.
+* Tombol **Pilih PDF**.
+* Informasi bahwa file diproses secara lokal.
+* Informasi format file yang didukung.
+
+Contoh copywriting:
+
+```text
+Tambahkan tanda FRAGILE ke PDF
+
+Buka file PDF, atur posisi overlay, lalu simpan sebagai PDF baru.
+
+Tarik PDF ke sini atau pilih dari perangkat.
+File diproses langsung di browser dan tidak diunggah.
+```
+
+### 10.2 Halaman editor
+
+Struktur utama:
+
+```text
+Header
+├── Nama file
+├── Ganti PDF
+└── Simpan PDF
+
+Toolbar
+├── Tambah Teks
+├── Tambah Gambar
+├── Hapus Overlay
+└── Reset Posisi
+
+Preview PDF
+├── Halaman PDF
+└── Overlay yang dapat digeser
+
+Navigasi halaman
+├── Halaman sebelumnya
+├── Nomor halaman
+└── Halaman berikutnya
+
+Panel properti
+├── Isi teks
+├── Ukuran
+├── Transparansi
+├── Rotasi
+└── Informasi semua halaman
+```
+
+---
+
+## 11. Kebutuhan Fungsional
+
+### FR-01 — Upload PDF
+
+Sistem harus menyediakan input file untuk memilih PDF dari perangkat.
+
+Kriteria:
+
+* Hanya menerima file dengan tipe PDF.
+* Mendukung drag-and-drop.
+* Menampilkan pesan error untuk file tidak valid.
+* Menampilkan nama file setelah berhasil dibuka.
+
+### FR-02 — Validasi PDF
+
+Sistem harus memvalidasi file sebelum membuka editor.
+
+Validasi minimum:
+
+* Format file adalah PDF.
+* File dapat dibaca.
+* File tidak rusak.
+* File tidak melebihi batas ukuran.
+* PDF tidak dilindungi password.
+
+Pesan error contoh:
+
+```text
+File tidak dapat dibuka. Pastikan file menggunakan format PDF dan tidak dilindungi password.
+```
+
+### FR-03 — Preview PDF
+
+Sistem harus menampilkan halaman PDF di area preview.
+
+Kriteria:
+
+* Halaman pertama ditampilkan setelah file dibuka.
+* Preview mempertahankan rasio halaman.
+* Preview dapat menyesuaikan lebar area editor.
+* Overlay berada tepat di atas halaman PDF.
+
+### FR-04 — Navigasi halaman
+
+Sistem harus memungkinkan pengguna berpindah halaman.
+
+Komponen:
+
+* Tombol halaman sebelumnya.
+* Tombol halaman berikutnya.
+* Nomor halaman aktif.
+* Jumlah keseluruhan halaman.
+
+Contoh:
+
+```text
+Halaman 2 dari 15
+```
+
+Navigasi halaman hanya mengubah preview. Overlay tetap menggunakan posisi global yang sama.
+
+### FR-05 — Tambah overlay teks
+
+Sistem harus memungkinkan pengguna membuat overlay teks.
+
+Nilai default:
+
+```text
+FRAGILE
+```
+
+Properti teks minimum:
+
+* Isi teks.
+* Ukuran teks.
+* Ketebalan teks.
+* Transparansi.
+* Rotasi.
+
+### FR-06 — Tambah overlay gambar
+
+Sistem harus memungkinkan pengguna memilih gambar sebagai overlay.
+
+Format minimum:
+
+* PNG.
+* JPG.
+* JPEG.
+
+Rekomendasi:
+
+* PNG transparan menjadi format utama.
+* Ukuran file gambar dibatasi, misalnya maksimal 5 MB.
+
+### FR-07 — Drag-and-drop overlay
+
+Sistem harus memungkinkan overlay dipindahkan dengan mouse.
+
+Kriteria:
+
+* Overlay hanya dapat dipindahkan di dalam area halaman PDF.
+* Overlay tidak dapat keluar dari batas halaman.
+* Posisi diperbarui setelah proses drag selesai.
+* Posisi tetap sama ketika pengguna berpindah halaman.
+* Cursor berubah saat overlay dapat dipindahkan.
+
+### FR-08 — Resize overlay
+
+Sistem harus menyediakan resize handle pada overlay.
+
+Kriteria:
+
+* Overlay dapat diperbesar atau diperkecil.
+* Resize mempertahankan rasio gambar secara default.
+* Overlay memiliki ukuran minimum.
+* Overlay tidak dapat melebihi area halaman.
+* Ukuran tetap sama secara proporsional pada seluruh halaman.
+
+### FR-09 — Rotasi overlay
+
+Sistem harus memungkinkan pengguna memutar overlay.
+
+Untuk MVP, rotasi dapat menggunakan pilihan:
+
+* 0°
+* 90°
+* 180°
+* 270°
+
+Rotasi bebas dapat ditambahkan setelah MVP.
+
+### FR-10 — Transparansi overlay
+
+Sistem harus menyediakan pengaturan transparansi.
+
+Rentang:
+
+```text
+10%–100%
+```
+
+Nilai default:
+
+```text
+100%
+```
+
+### FR-11 — Overlay global
+
+Sistem harus memperlakukan overlay sebagai overlay global.
+
+Aturan:
+
+* Overlay diterapkan ke semua halaman.
+* Posisi yang diubah pada satu halaman berlaku ke semua halaman.
+* Ukuran yang diubah berlaku ke semua halaman.
+* Transparansi dan rotasi berlaku ke semua halaman.
+* Pengguna tidak perlu mengatur overlay per halaman.
+
+UI harus menampilkan informasi:
+
+```text
+Overlay akan diterapkan ke semua halaman.
+```
+
+### FR-12 — Hapus overlay
+
+Sistem harus menyediakan tindakan untuk menghapus overlay.
+
+Setelah dihapus:
+
+* Overlay tidak muncul di preview.
+* Tombol simpan dapat dinonaktifkan atau menghasilkan PDF tanpa overlay.
+* Pengguna dapat menambahkan overlay baru.
+
+### FR-13 — Reset posisi
+
+Sistem harus menyediakan tombol **Reset Posisi**.
+
+Reset mengembalikan overlay ke:
+
+* Posisi tengah halaman.
+* Ukuran default.
+* Rotasi 0°.
+* Transparansi 100%.
+
+Isi teks atau gambar tidak harus dihapus.
+
+### FR-14 — Export PDF
+
+Sistem harus menghasilkan PDF baru yang sudah memiliki overlay.
+
+Proses export:
+
+1. Membaca file PDF asli.
+2. Membuka semua halaman.
+3. Menghitung posisi overlay pada setiap halaman.
+4. Menggambar overlay ke setiap halaman.
+5. Membuat file PDF baru.
+6. Mengunduh file melalui browser.
+
+Format nama file:
+
+```text
+{nama-file-asli}-overlay.pdf
+```
+
+Contoh:
+
+```text
+resi-pengiriman.pdf
+```
+
+menjadi:
+
+```text
+resi-pengiriman-overlay.pdf
+```
+
+### FR-15 — Status export
+
+Sistem harus memberikan umpan balik selama export.
+
+Status contoh:
+
+```text
+Menyiapkan PDF...
+Menerapkan overlay ke 15 halaman...
+PDF berhasil dibuat.
+```
+
+Tombol simpan harus dinonaktifkan selama proses berlangsung untuk mencegah export ganda.
+
+---
+
+## 12. Aturan Bisnis
+
+### BR-01
+
+File asli tidak boleh ditimpa atau diubah.
+
+### BR-02
+
+Hasil export harus dibuat sebagai file baru.
+
+### BR-03
+
+Overlay harus diterapkan ke seluruh halaman PDF.
+
+### BR-04
+
+Hanya satu overlay aktif yang digunakan pada MVP.
+
+### BR-05
+
+Posisi overlay harus disimpan dalam bentuk rasio terhadap ukuran halaman preview.
+
+### BR-06
+
+Sistem harus mempertahankan posisi relatif overlay pada halaman PDF yang memiliki ukuran berbeda.
+
+### BR-07
+
+Semua proses harus dapat berjalan tanpa backend.
+
+### BR-08
+
+Dokumen pengguna tidak boleh otomatis dikirim ke server.
+
+---
+
+## 13. Model Data
+
+### 13.1 Data dokumen
+
+```ts
+type PdfDocumentState = {
+  file: File;
+  fileName: string;
+  fileSize: number;
+  totalPages: number;
+  currentPage: number;
+};
+```
+
+### 13.2 Data overlay
+
+```ts
+type Overlay = {
+  id: string;
+  type: "text" | "image";
+
+  text?: string;
+  imageUrl?: string;
+  imageBytes?: ArrayBuffer;
+
+  xRatio: number;
+  yRatio: number;
+  widthRatio: number;
+  heightRatio: number;
+
+  rotation: 0 | 90 | 180 | 270;
+  opacity: number;
+
+  applyMode: "all-pages";
+};
+```
+
+### 13.3 Contoh data overlay
+
+```ts
+const overlay: Overlay = {
+  id: "overlay-1",
+  type: "text",
+  text: "FRAGILE",
+
+  xRatio: 0.7,
+  yRatio: 0.08,
+  widthRatio: 0.2,
+  heightRatio: 0.06,
+
+  rotation: 0,
+  opacity: 1,
+
+  applyMode: "all-pages",
+};
+```
+
+---
+
+## 14. Sistem Koordinat Overlay
+
+Posisi drag-and-drop pada browser menggunakan koordinat dari kiri atas.
+
+```text
+0,0 ───────────────▶ X
+ │
+ │
+ ▼
+ Y
+```
+
+Sementara koordinat PDF menggunakan titik awal dari kiri bawah.
+
+```text
+Y
+▲
+│
+│
+0,0 ───────────────▶ X
+```
+
+Karena itu, koordinat preview harus dikonversi sebelum overlay digambar ke PDF.
+
+### 14.1 Penyimpanan posisi
+
+Posisi tidak disimpan sebagai pixel tetap.
+
+Gunakan nilai rasio:
+
+```ts
+xRatio = overlayX / previewWidth;
+yRatio = overlayY / previewHeight;
+
+widthRatio = overlayWidth / previewWidth;
+heightRatio = overlayHeight / previewHeight;
+```
+
+### 14.2 Konversi untuk export
+
+```ts
+const overlayWidth = widthRatio * pdfWidth;
+const overlayHeight = heightRatio * pdfHeight;
+
+const x = xRatio * pdfWidth;
+const yTop = yRatio * pdfHeight;
+
+const y = pdfHeight - yTop - overlayHeight;
+```
+
+Pendekatan ini menjaga posisi overlay tetap konsisten walaupun ukuran preview berubah.
+
+---
+
+## 15. Arsitektur Teknis
+
+### 15.1 Rekomendasi teknologi
+
+```text
+Frontend          : React + Vite
+Bahasa            : TypeScript
+Styling           : Tailwind CSS
+Komponen UI       : shadcn/ui
+PDF preview       : PDF.js / pdfjs-dist
+PDF modification  : pdf-lib
+Drag dan resize   : react-rnd
+Deployment        : Vercel
+Backend           : Tidak diperlukan
+Database          : Tidak diperlukan
+```
+
+### 15.2 Alur teknis
+
+```text
+File PDF
+   ↓
+File API Browser
+   ↓
+PDF.js merender halaman aktif
+   ↓
+React menampilkan overlay HTML
+   ↓
+react-rnd mengatur drag dan resize
+   ↓
+Posisi disimpan sebagai rasio
+   ↓
+pdf-lib menambahkan overlay ke semua halaman
+   ↓
+Browser mengunduh PDF baru
+```
+
+### 15.3 Pemisahan tanggung jawab library
+
+#### PDF.js
+
+Digunakan untuk:
+
+* Membaca jumlah halaman.
+* Merender halaman PDF.
+* Menampilkan preview.
+
+#### react-rnd
+
+Digunakan untuk:
+
+* Drag overlay.
+* Resize overlay.
+* Membatasi overlay agar tetap berada di dalam halaman.
+
+#### pdf-lib
+
+Digunakan untuk:
+
+* Membuka PDF asli.
+* Menanam gambar atau teks ke halaman.
+* Mengulang proses pada semua halaman.
+* Menyimpan PDF hasil.
+
+---
+
+## 16. Struktur Komponen Frontend
+
+Rekomendasi struktur:
+
+```text
+src/
+├── components/
+│   ├── pdf/
+│   │   ├── PdfUploader.tsx
+│   │   ├── PdfEditor.tsx
+│   │   ├── PdfPagePreview.tsx
+│   │   ├── PdfNavigation.tsx
+│   │   └── PdfExportButton.tsx
+│   │
+│   ├── overlay/
+│   │   ├── OverlayRenderer.tsx
+│   │   ├── TextOverlay.tsx
+│   │   ├── ImageOverlay.tsx
+│   │   └── OverlayProperties.tsx
+│   │
+│   └── common/
+│       ├── LoadingState.tsx
+│       └── ErrorMessage.tsx
+│
+├── hooks/
+│   ├── usePdfDocument.ts
+│   ├── usePdfRenderer.ts
+│   └── useOverlay.ts
+│
+├── lib/
+│   ├── pdf-renderer.ts
+│   ├── pdf-exporter.ts
+│   ├── coordinate-converter.ts
+│   └── file-validator.ts
+│
+├── types/
+│   ├── pdf.ts
+│   └── overlay.ts
+│
+└── App.tsx
+```
+
+---
+
+## 17. State Utama Aplikasi
+
+```ts
+type EditorState = {
+  pdfFile: File | null;
+  pdfName: string;
+  totalPages: number;
+  currentPage: number;
+
+  overlay: Overlay | null;
+
+  isRendering: boolean;
+  isExporting: boolean;
+
+  error: string | null;
+};
+```
+
+State yang tidak perlu disimpan permanen:
+
+* File PDF.
+* Preview halaman.
+* Overlay.
+* Pengaturan editor.
+
+Semua state dapat hilang ketika halaman browser ditutup atau direfresh.
+
+---
+
+## 18. Desain Interaksi Overlay
+
+Overlay memiliki dua kondisi visual.
+
+### 18.1 Tidak dipilih
+
+* Tidak menampilkan border.
+* Overlay terlihat seperti hasil akhir.
+* Hover menampilkan cursor pindah.
+
+### 18.2 Dipilih
+
+* Menampilkan border putus-putus.
+* Menampilkan resize handle.
+* Menampilkan tombol hapus.
+* Menampilkan tombol atau indikator rotasi.
+* Panel properti menjadi aktif.
+
+Contoh tampilan:
+
+```text
+┌─────────────────────────┐
+│                         │
+│        FRAGILE          │
+│                         │
+└─────────────────────────┘
+```
+
+Ketika dipilih:
+
+```text
+●────────────────────────●
+│                        │
+│        FRAGILE         │
+│                        │
+●────────────────────────●
+```
+
+---
+
+## 19. Copywriting Antarmuka
+
+### Upload
+
+Judul:
+
+```text
+Tambahkan overlay ke PDF
+```
+
+Deskripsi:
+
+```text
+Buka PDF, atur posisi overlay, lalu simpan sebagai file baru.
+```
+
+Area upload:
+
+```text
+Tarik file PDF ke sini
+atau pilih dari perangkat
+```
+
+Privasi:
+
+```text
+File diproses langsung di browser dan tidak diunggah.
+```
+
+### Editor
+
+Tombol:
+
+```text
+Tambah Teks
+Tambah Gambar
+Reset Posisi
+Hapus Overlay
+Ganti PDF
+Simpan PDF
+```
+
+Informasi global:
+
+```text
+Overlay ini akan diterapkan ke semua halaman.
+```
+
+### Export
+
+Loading:
+
+```text
+Sedang membuat PDF...
+```
+
+Berhasil:
+
+```text
+PDF berhasil dibuat.
+```
+
+Error:
+
+```text
+PDF gagal dibuat. Silakan coba kembali.
+```
+
+---
+
+## 20. Penanganan Error
+
+### File bukan PDF
+
+```text
+Format file tidak didukung. Pilih file PDF.
+```
+
+### PDF rusak
+
+```text
+File PDF tidak dapat dibaca atau rusak.
+```
+
+### PDF menggunakan password
+
+```text
+PDF yang dilindungi password belum didukung.
+```
+
+### File terlalu besar
+
+```text
+Ukuran file terlalu besar. Pilih PDF dengan ukuran maksimal 25 MB.
+```
+
+### Gambar overlay tidak valid
+
+```text
+Gambar tidak dapat digunakan. Pilih file PNG atau JPG.
+```
+
+### Export gagal
+
+```text
+PDF gagal dibuat. Periksa file dan coba kembali.
+```
+
+### Browser kekurangan memori
+
+```text
+Dokumen terlalu besar untuk diproses di browser ini.
+```
+
+---
+
+## 21. Kebutuhan Nonfungsional
+
+### NFR-01 — Privasi
+
+File PDF harus diproses secara lokal di browser.
+
+### NFR-02 — Performa
+
+Preview halaman pertama sebaiknya muncul secepat mungkin setelah PDF dibuka.
+
+Target awal:
+
+```text
+PDF 5 MB dengan 10 halaman:
+Preview awal kurang dari 3 detik pada perangkat normal.
+```
+
+### NFR-03 — Responsivitas
+
+MVP dioptimalkan untuk desktop dengan lebar minimum 1024 piksel.
+
+Tablet dapat didukung, tetapi tidak menjadi prioritas awal.
+
+### NFR-04 — Kompatibilitas browser
+
+Target minimum:
+
+* Google Chrome versi terbaru.
+* Microsoft Edge versi terbaru.
+* Mozilla Firefox versi terbaru.
+
+### NFR-05 — Keamanan
+
+* Jangan menjalankan script dari isi PDF.
+* Jangan mengunggah PDF tanpa persetujuan pengguna.
+* Validasi MIME type dan ekstensi.
+* Bersihkan object URL setelah selesai digunakan.
+
+### NFR-06 — Stabilitas
+
+Aplikasi harus menampilkan error yang jelas jika proses render atau export gagal.
+
+---
+
+## 22. Acceptance Criteria
+
+### Membuka PDF
+
+* Pengguna dapat memilih PDF dari perangkat.
+* Pengguna dapat drag-and-drop PDF.
+* File PDF valid berhasil ditampilkan.
+* File tidak valid menampilkan pesan error.
+
+### Preview
+
+* Halaman pertama tampil setelah file dibuka.
+* Pengguna dapat berpindah halaman.
+* Nomor halaman aktif ditampilkan.
+* Jumlah halaman ditampilkan.
+
+### Overlay
+
+* Pengguna dapat menambahkan overlay teks.
+* Pengguna dapat menambahkan overlay gambar.
+* Overlay dapat digeser.
+* Overlay dapat diperbesar dan diperkecil.
+* Overlay tidak keluar dari halaman.
+* Posisi overlay tidak berubah saat berpindah halaman.
+* Overlay terlihat pada setiap halaman preview.
+* Pengaturan overlay berlaku global.
+
+### Export
+
+* Tombol simpan membuat PDF baru.
+* Overlay muncul di seluruh halaman hasil PDF.
+* Posisi overlay sesuai dengan preview.
+* Ukuran overlay sesuai dengan preview.
+* File asli tidak berubah.
+* File hasil dapat dibuka oleh aplikasi pembaca PDF biasa.
+* Nama file hasil memiliki suffix `-overlay`.
+
+---
+
+## 23. Skenario Pengujian Utama
+
+### Test 1 — PDF satu halaman
+
+1. Buka PDF satu halaman.
+2. Tambahkan overlay teks.
+3. Atur posisi.
+4. Simpan PDF.
+5. Pastikan overlay muncul pada halaman tersebut.
+
+### Test 2 — PDF banyak halaman
+
+1. Buka PDF dengan 10 halaman.
+2. Tambahkan overlay gambar.
+3. Letakkan di kanan atas.
+4. Simpan PDF.
+5. Pastikan overlay muncul di seluruh 10 halaman.
+
+### Test 3 — Navigasi halaman
+
+1. Buka PDF dengan beberapa halaman.
+2. Atur overlay pada halaman pertama.
+3. Pindah ke halaman kedua.
+4. Pastikan overlay berada di posisi relatif yang sama.
+5. Pindah ke halaman lain.
+6. Pastikan posisi tetap konsisten.
+
+### Test 4 — Halaman berbeda ukuran
+
+1. Buka PDF yang memiliki ukuran halaman berbeda.
+2. Atur overlay.
+3. Simpan PDF.
+4. Pastikan overlay berada pada posisi relatif yang sama di setiap halaman.
+
+### Test 5 — Resize overlay
+
+1. Tambahkan overlay gambar.
+2. Perbesar overlay.
+3. Pindah halaman.
+4. Pastikan ukuran relatif tetap konsisten.
+5. Simpan PDF.
+6. Pastikan hasil export sesuai preview.
+
+### Test 6 — File tidak valid
+
+1. Pilih file JPG melalui input PDF.
+2. Pastikan aplikasi menolak file.
+3. Pastikan pesan error tampil.
+
+### Test 7 — Export ganda
+
+1. Tekan tombol simpan.
+2. Tekan kembali saat proses berjalan.
+3. Pastikan export kedua tidak dijalankan.
+
+---
+
+## 24. Tahapan Pengembangan
+
+### Tahap 1 — Setup proyek
+
+* Membuat proyek React dan TypeScript.
+* Menambahkan Tailwind CSS.
+* Menambahkan shadcn/ui.
+* Menambahkan PDF.js.
+* Menambahkan pdf-lib.
+* Menambahkan react-rnd.
+
+### Tahap 2 — Upload dan preview
+
+* Membuat area upload.
+* Membuat validasi PDF.
+* Membaca jumlah halaman.
+* Merender halaman pertama.
+* Membuat navigasi halaman.
+
+### Tahap 3 — Overlay
+
+* Membuat overlay teks.
+* Membuat upload gambar overlay.
+* Menambahkan drag.
+* Menambahkan resize.
+* Membatasi overlay di dalam halaman.
+* Menyimpan koordinat sebagai rasio.
+
+### Tahap 4 — Panel properti
+
+* Mengubah isi teks.
+* Mengatur opacity.
+* Mengatur rotasi.
+* Menghapus overlay.
+* Reset posisi.
+
+### Tahap 5 — Export
+
+* Membaca PDF dengan pdf-lib.
+* Mengonversi koordinat.
+* Melakukan loop semua halaman.
+* Menambahkan overlay.
+* Menghasilkan file PDF baru.
+* Mengunduh hasil.
+
+### Tahap 6 — Pengujian
+
+* Pengujian berbagai ukuran PDF.
+* Pengujian PDF banyak halaman.
+* Pengujian halaman dengan ukuran berbeda.
+* Pengujian overlay teks dan gambar.
+* Pengujian performa.
+* Pengujian browser.
+
+---
+
+## 25. Prioritas Pengembangan
+
+### P0 — Wajib untuk MVP
+
+* Upload PDF.
+* Preview PDF.
+* Navigasi halaman.
+* Tambah overlay gambar atau teks.
+* Drag overlay.
+* Resize overlay.
+* Overlay di semua halaman.
+* Export PDF baru.
+
+### P1 — Penting setelah alur utama stabil
+
+* Transparansi.
+* Rotasi 90°.
+* Reset posisi.
+* Error handling.
+* Loading state.
+* Ganti PDF.
+
+### P2 — Pengembangan lanjutan
+
+* Beberapa overlay.
+* Template overlay.
+* Overlay hanya pada halaman tertentu.
+* Undo dan redo.
+* Zoom preview.
+* Simpan preset.
+* Dukungan mobile.
+* Penyimpanan cloud.
+
+---
+
+## 26. Risiko Teknis
+
+### Risiko 1 — PDF terlalu besar
+
+PDF dengan banyak halaman dapat menggunakan memori browser yang besar.
+
+Mitigasi:
+
+* Render hanya halaman aktif.
+* Jangan merender semua halaman sekaligus.
+* Tampilkan peringatan untuk file besar.
+* Batasi ukuran file pada MVP.
+
+### Risiko 2 — Posisi preview berbeda dari hasil export
+
+Hal ini dapat terjadi jika koordinat disimpan dalam pixel.
+
+Mitigasi:
+
+* Simpan posisi dalam bentuk rasio.
+* Gunakan ukuran halaman PDF asli saat export.
+* Buat pengujian otomatis untuk konversi koordinat.
+
+### Risiko 3 — Rotasi halaman PDF
+
+Beberapa PDF memiliki metadata rotasi.
+
+Mitigasi:
+
+* Baca rotasi halaman dari PDF.js.
+* Sesuaikan perhitungan koordinat berdasarkan rotasi.
+* Tambahkan test PDF dengan orientasi portrait dan landscape.
+
+### Risiko 4 — Font hasil export berbeda
+
+Font browser tidak otomatis tersedia pada pdf-lib.
+
+Mitigasi:
+
+* Gunakan font standar PDF untuk MVP.
+* Gunakan overlay gambar untuk desain teks yang kompleks.
+* Tambahkan custom font embedding pada versi lanjutan.
+
+### Risiko 5 — Performa export
+
+Export PDF dengan banyak halaman dapat membutuhkan waktu.
+
+Mitigasi:
+
+* Tampilkan progress.
+* Nonaktifkan tombol selama export.
+* Hindari melakukan render visual semua halaman.
+* Gunakan satu gambar overlay yang sudah di-embed dan dipakai ulang.
+
+---
+
+## 27. Definition of Done
+
+MVP dianggap selesai apabila:
+
+1. Pengguna dapat membuka PDF.
+2. PDF dapat ditampilkan di browser.
+3. Pengguna dapat menambahkan satu overlay.
+4. Overlay dapat digeser dan diubah ukurannya.
+5. Posisi overlay berlaku untuk semua halaman.
+6. Pengguna dapat melihat overlay saat berpindah halaman.
+7. PDF baru dapat dibuat dan diunduh.
+8. Overlay muncul pada seluruh halaman hasil export.
+9. Posisi hasil export sesuai dengan preview.
+10. File asli tidak berubah.
+11. Aplikasi dapat dijalankan tanpa backend.
+12. Aplikasi dapat di-deploy ke Vercel.
+
+---
+
+## 28. Ringkasan MVP
+
+Versi pertama aplikasi hanya memiliki satu pekerjaan utama:
+
+> Membuka PDF, menempatkan satu overlay dengan drag-and-drop, menerapkannya ke seluruh halaman, lalu menyimpan dokumen sebagai PDF baru.
+
+Scope tersebut harus dipertahankan sampai fungsi inti stabil. Fitur lanjutan sebaiknya tidak ditambahkan sebelum akurasi posisi overlay dan hasil export berhasil diuji pada berbagai jenis PDF.
