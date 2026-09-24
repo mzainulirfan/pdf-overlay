@@ -27,6 +27,7 @@ export async function exportPdfWithOverlays(
   });
 
   const pages = pdfDoc.getPages();
+  const visibleOverlays = overlays.filter((o) => o.visible !== false);
   const imageCache = new Map<string, Promise<import("pdf-lib").PDFImage>>();
 
   for (let i = 0; i < pages.length; i++) {
@@ -35,7 +36,7 @@ export async function exportPdfWithOverlays(
 
     const { width: pdfWidth, height: pdfHeight } = page.getSize();
 
-    for (const overlay of overlays) {
+    for (const overlay of visibleOverlays) {
       const box = overlayPdfBox(overlay, pdfWidth, pdfHeight);
       const outWidth = Math.max(1, Math.round(box.width));
       const outHeight = Math.max(1, Math.round(box.height));

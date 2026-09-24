@@ -19,22 +19,28 @@ export type Overlay = {
   rotation: Rotation;
   opacity: number;
 
+  /** false = disembunyikan dari preview & hasil export. */
+  visible: boolean;
+
   applyMode: "all-pages";
 };
 
 export const DEFAULT_OVERLAY_TEXT = "FRAGILE";
 
-export function createTextOverlay(): Overlay {
+export function createTextOverlay(
+  text: string = DEFAULT_OVERLAY_TEXT,
+): Overlay {
   return {
     id: `overlay-${crypto.randomUUID()}`,
     type: "text",
-    text: DEFAULT_OVERLAY_TEXT,
+    text,
     xRatio: 0.375,
     yRatio: 0.45,
     widthRatio: 0.25,
     heightRatio: 0.1,
     rotation: 0,
     opacity: 1,
+    visible: true,
     applyMode: "all-pages",
   };
 }

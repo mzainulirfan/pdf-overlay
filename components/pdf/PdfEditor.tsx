@@ -31,9 +31,11 @@ import {
 } from "@/types/template";
 import ErrorMessage from "@/components/common/ErrorMessage";
 import LoadingState from "@/components/common/LoadingState";
+import Toast, { type ToastData } from "@/components/common/Toast";
 import PdfUploader from "@/components/pdf/PdfUploader";
 import PdfNavigation from "@/components/pdf/PdfNavigation";
 import PdfPagePreview from "@/components/pdf/PdfPagePreview";
+import OverlayList, { overlayLabel } from "@/components/overlay/OverlayList";
 import OverlayProperties from "@/components/overlay/OverlayProperties";
 import TemplatePanel from "@/components/template/TemplatePanel";
 
@@ -63,9 +65,130 @@ export default function PdfEditor() {
   const [error, setError] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const editorActiveRef = useRef(false);
+  const [toasts, setToasts] = useState<ToastData[]>([]);
 
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const pushToast = useCallback(
+    (
+      type: ToastData["type"],
+      message: string,
+      opts?: {
+        action?: { label: string; onClick: () => void };
+        durationMs?: number;
+      },
+    ) => {
+      const id = Date.now() + Math.random();
+      setToasts((prev) => [...prev, { id, type, message, action: opts?.action }]);
+      window.setTimeout(() => {
+        dismissToast(id);
+      }, opts?.durationMs ?? 4000);
+    },
+    [dismissToast],
+  );
+
+  const [lastDeleted, setLastDeleted] = useState<{
+    overlay: Overlay;
+    image: HTMLImageElement | null;
+    index: number;
+  } | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const confirmTimerRef = useRef<number | null>(null);
+
+  const clearDeleteConfirm = useCallback(() => {
+    if (confirmTimerRef.current) {
+      window.clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = null;
+    }
+    setConfirmDeleteId(null);
+  }, []);
+
+  const armDeleteConfirm = useCallback((id: string) => {
+    if (confirmTimerRef.current) window.clearTimeout(confirmTimerRef.current);
+    setConfirmDeleteId(id);
+    confirmTimerRef.current = window.setTimeout(() => {
+      confirmTimerRef.current = null;
+      setConfirmDeleteId(null);
+    }, 3000);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (confirmTimerRef.current) window.clearTimeout(confirmTimerRef.current);
+    },
+    [],
+  );
+
+  const undoDelete = useCallback(() => {
+    if (!lastDeleted) return;
+    const { overlay, image, index } = lastDeleted;
+    setOverlays((prev) => {
+      if (prev.some((o) => o.id === overlay.id)) return prev;
+      const next = [...prev];
+      next.splice(Math.min(index, next.length), 0, overlay);
+      return next;
+    });
+    if (image) {
+      setOverlayImages((prev) => ({ ...prev, [overlay.id]: image }));
+    }
+    setSelectedOverlayId(overlay.id);
+    setLastDeleted(null);
+  }, [lastDeleted]);
+
+  const deleteOverlay = useCallback(
+    (id: string) => {
+      const index = overlays.findIndex((o) => o.id === id);
+      if (index === -1) return;
+      const target = overlays[index];
+      const image = overlayImages[id] ?? null;
+      setOverlays((prev) => prev.filter((o) => o.id !== id));
+      setOverlayImages((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setSelectedOverlayId((prev) => (prev === id ? null : prev));
+      clearDeleteConfirm();
+      setLastDeleted({ overlay: target, image, index });
+      pushToast("info", "Overlay dihapus.", {
+        action: { label: "Urungkan", onClick: undoDelete },
+        durationMs: 5000,
+      });
+    },
+    [overlays, overlayImages, pushToast, undoDelete, clearDeleteConfirm],
+  );
+
+  // Catatan: confirmDeleteId yang basi otomatis inert karena tombol hanya
+  // armed bila id-nya sama dengan overlay yang sedang dipilih, dan timer
+  // 3 detik membersihkannya.
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [previewWidth, setPreviewWidth] = useState(720);
+  const [zoom, setZoom] = useState(1);
+  const [templateOpen, setTemplateOpen] = useState(true);
+  const [presetOpen, setPresetOpen] = useState(false);
+  const exportTitleRef = useRef<HTMLParagraphElement>(null);
+
+  const TEXT_PRESETS = [
+    "FRAGILE",
+    "HANDLE WITH CARE",
+    "JANGAN DIBANTING",
+    "BARANG MUDAH PECAH",
+    "THIS SIDE UP",
+  ];
+
+  const MIN_ZOOM = 0.5;
+  const MAX_ZOOM = 2;
+  const ZOOM_STEP = 0.25;
+
+  const zoomIn = useCallback(() => {
+    setZoom((z) => Math.min(MAX_ZOOM, Math.round((z + ZOOM_STEP) * 100) / 100));
+  }, []);
+  const zoomOut = useCallback(() => {
+    setZoom((z) => Math.max(MIN_ZOOM, Math.round((z - ZOOM_STEP) * 100) / 100));
+  }, []);
+  const zoomFit = useCallback(() => setZoom(1), []);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const renderTokenRef = useRef(0);
 
@@ -148,8 +271,9 @@ export default function PdfEditor() {
       });
       setActiveTemplateId(template.id);
       persistActiveTemplateId(template.id);
+      pushToast("success", `Template "${name}" berhasil disimpan.`);
     },
-    [overlays],
+    [overlays, pushToast],
   );
 
   const handleDeleteTemplate = useCallback((id: string) => {
@@ -215,6 +339,8 @@ export default function PdfEditor() {
         setOverlays([]);
         setOverlayImages({});
         setSelectedOverlayId(null);
+        setLastDeleted(null);
+        clearDeleteConfirm();
         setPdfInfo({
           file,
           fileName: file.name,
@@ -231,7 +357,7 @@ export default function PdfEditor() {
         setError((err as Error)?.message ?? "File tidak dapat diproses.");
       }
     },
-    [templates, activeTemplateId, applyTemplate],
+    [templates, activeTemplateId, applyTemplate, clearDeleteConfirm],
   );
 
   useEffect(() => {
@@ -265,6 +391,16 @@ export default function PdfEditor() {
   useEffect(() => {
     editorActiveRef.current = Boolean(pdfInfo && pdfDoc);
   }, [pdfInfo, pdfDoc]);
+
+  // Pindahkan fokus ke dialog saat export dimulai, kembalikan saat selesai.
+  useEffect(() => {
+    if (!exportMessage) return;
+    const previous = document.activeElement as HTMLElement | null;
+    exportTitleRef.current?.focus();
+    return () => {
+      previous?.focus?.();
+    };
+  }, [exportMessage]);
 
   useEffect(() => {
     let depth = 0;
@@ -318,7 +454,7 @@ export default function PdfEditor() {
         const { canvas, width, height } = await renderPageToCanvas(
           pdfDoc,
           currentPage,
-          previewWidth,
+          Math.max(1, Math.floor(previewWidth * zoom)),
           maxHeight,
         );
         if (token !== renderTokenRef.current) return;
@@ -334,7 +470,7 @@ export default function PdfEditor() {
     };
 
     void run();
-  }, [pdfDoc, currentPage, previewWidth]);
+  }, [pdfDoc, currentPage, previewWidth, zoom]);
 
   const goToPage = useCallback(
     (page: number) => {
@@ -351,8 +487,8 @@ export default function PdfEditor() {
     );
   }, []);
 
-  const addTextOverlay = useCallback(() => {
-    const overlay = createTextOverlay();
+  const addTextOverlay = useCallback((text?: string) => {
+    const overlay = createTextOverlay(text);
     setOverlays((prev) => [...prev, overlay]);
     setSelectedOverlayId(overlay.id);
     setError(null);
@@ -388,6 +524,7 @@ export default function PdfEditor() {
         heightRatio: 0.3,
         rotation: 0,
         opacity: 1,
+        visible: true,
         applyMode: "all-pages",
       };
       setOverlays((prev) => [...prev, overlay]);
@@ -398,14 +535,11 @@ export default function PdfEditor() {
     }
   }, []);
 
-  const deleteOverlay = useCallback((id: string) => {
-    setOverlays((prev) => prev.filter((o) => o.id !== id));
-    setOverlayImages((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    setSelectedOverlayId((prev) => (prev === id ? null : prev));
+
+  const toggleOverlayVisibility = useCallback((id: string) => {
+    setOverlays((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, visible: !o.visible } : o)),
+    );
   }, []);
 
   const resetOverlay = useCallback((id: string) => {
@@ -427,10 +561,11 @@ export default function PdfEditor() {
   }, []);
 
   const buildExportBytes = useCallback(async () => {
-    if (!pdfBytes || overlays.length === 0) return null;
+    const visible = overlays.filter((o) => o.visible !== false);
+    if (!pdfBytes || visible.length === 0) return null;
     return exportPdfWithOverlays(
       pdfBytes,
-      overlays,
+      visible,
       overlayImages,
       (msg) => setExportMessage(msg),
     );
@@ -475,7 +610,8 @@ export default function PdfEditor() {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-  }, [withExportGuard, buildExportBytes, pdfInfo]);
+    pushToast("success", "PDF berhasil dibuat dan siap diunduh.");
+  }, [withExportGuard, buildExportBytes, pdfInfo, pushToast]);
 
   const handlePrint = useCallback(async () => {
     const result = await withExportGuard(buildExportBytes);
@@ -575,7 +711,9 @@ export default function PdfEditor() {
     setOverlayImages({});
     setSelectedOverlayId(null);
     setError(null);
-  }, []);
+    setLastDeleted(null);
+    clearDeleteConfirm();
+  }, [clearDeleteConfirm]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -594,7 +732,16 @@ export default function PdfEditor() {
         } else if (key === "p") {
           e.preventDefault();
           if (editorActiveRef.current) void handlePrint();
+        } else if (key === "z" && !isTyping) {
+          e.preventDefault();
+          if (editorActiveRef.current) undoDelete();
         }
+        return;
+      }
+
+      if (e.key === "Escape") {
+        clearDeleteConfirm();
+        setPresetOpen(false);
         return;
       }
 
@@ -607,38 +754,66 @@ export default function PdfEditor() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleExport, handlePrint, deleteOverlay, selectedOverlayId]);
+  }, [
+    handleExport,
+    handlePrint,
+    deleteOverlay,
+    selectedOverlayId,
+    undoDelete,
+    clearDeleteConfirm,
+  ]);
 
   if (!pdfInfo || !pdfDoc) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 pb-16">
+      <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 pb-16">
         <PdfUploader onSelect={handleSelectFile} onSelectUrl={handleSelectUrl} />
         {error && <ErrorMessage message={error} />}
-        <div className="mx-auto w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <TemplatePanel
-            templates={templates}
-            activeTemplateId={activeTemplateId}
-            canSave={false}
-            onSelect={handleSelectTemplate}
-            onSave={handleSaveTemplate}
-            onDelete={handleDeleteTemplate}
-          />
-        </div>
+        {templates.length > 0 && (
+          <div className="mx-auto w-full rounded-2xl border border-slate-800 bg-slate-900 p-5">
+            <TemplatePanel
+              templates={templates}
+              activeTemplateId={activeTemplateId}
+              canSave={false}
+              onSelect={handleSelectTemplate}
+              onSave={handleSaveTemplate}
+              onDelete={handleDeleteTemplate}
+            />
+          </div>
+        )}
+        <Toast toasts={toasts} onDismiss={dismissToast} />
       </main>
     );
   }
 
-  const exportDisabled = overlays.length === 0 || isExporting;
+  const exportDisabled =
+    overlays.every((o) => o.visible === false) || isExporting;
   const selectedOverlay =
     overlays.find((o) => o.id === selectedOverlayId) ?? null;
+  const selectedLabel = selectedOverlay
+    ? overlayLabel(
+        selectedOverlay,
+        overlays.findIndex((o) => o.id === selectedOverlay.id),
+      )
+    : null;
+  const deleteArmed =
+    !!selectedOverlay && confirmDeleteId === selectedOverlay.id;
+
+  const handleToolbarDelete = () => {
+    if (!selectedOverlay) return;
+    if (deleteArmed) {
+      deleteOverlay(selectedOverlay.id);
+    } else {
+      armDeleteConfirm(selectedOverlay.id);
+    }
+  };
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pb-12">
       {/* Header */}
-      <header className="sticky top-0 z-20 -mx-6 border-b border-slate-200 bg-slate-50/85 px-6 py-3 backdrop-blur">
+      <header className="sticky top-0 z-20 -mx-6 border-b border-slate-800 bg-slate-950/85 px-6 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-white">
               <svg
                 className="h-5 w-5"
                 fill="none"
@@ -654,7 +829,7 @@ export default function PdfEditor() {
               </svg>
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-semibold text-slate-900">
+              <h1 className="truncate text-sm font-semibold text-slate-100">
                 {pdfInfo.fileName}
               </h1>
               <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
@@ -662,7 +837,7 @@ export default function PdfEditor() {
                 <span aria-hidden>·</span>
                 <span>{(pdfInfo.fileSize / 1024 / 1024).toFixed(2)} MB</span>
                 <span aria-hidden>·</span>
-                <span className="font-medium text-indigo-600">
+                <span className="font-medium text-indigo-300">
                   {overlays.length} overlay
                 </span>
               </p>
@@ -672,7 +847,7 @@ export default function PdfEditor() {
             <button
               type="button"
               onClick={resetToUpload}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800"
             >
               Ganti PDF
             </button>
@@ -680,7 +855,7 @@ export default function PdfEditor() {
               type="button"
               onClick={handlePrint}
               disabled={exportDisabled}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isExporting ? "Membuat PDF..." : "Cetak"}
             </button>
@@ -688,7 +863,7 @@ export default function PdfEditor() {
               type="button"
               onClick={handleExport}
               disabled={exportDisabled}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-indigo-200 transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isExporting ? "Membuat PDF..." : "Simpan PDF"}
             </button>
@@ -697,70 +872,180 @@ export default function PdfEditor() {
       </header>
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={addTextOverlay}
-          className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+        <span
+          aria-live="polite"
+          className="order-first mb-1 w-full text-xs text-slate-500 sm:order-last sm:mb-0 sm:ml-auto sm:w-auto"
         >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+          <span className="font-medium text-indigo-300">
+            {overlays.length} overlay
+          </span>{" "}
+          · berlaku ke semua halaman
+        </span>
+
+        <div role="group" aria-label="Tambah overlay" className="flex items-center gap-2">
+          <div className="relative">
+            <div className="flex">
+              <button
+                type="button"
+                onClick={() => addTextOverlay()}
+                title="Tambah overlay teks FRAGILE"
+                className="inline-flex items-center gap-2 rounded-l-lg bg-indigo-500 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-400"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m-7-7h14" />
+                </svg>
+                Tambah Teks
+              </button>
+              <button
+                type="button"
+                onClick={() => setPresetOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={presetOpen}
+                aria-label="Pilih preset teks"
+                title="Pilih preset teks"
+                className="rounded-r-lg border-l border-indigo-400/40 bg-indigo-500 px-2 text-white transition-colors hover:bg-indigo-400"
+              >
+                <svg
+                  className={`h-4 w-4 transition-transform ${presetOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+            </div>
+            {presetOpen && (
+              <>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-hidden
+                  onClick={() => setPresetOpen(false)}
+                  className="fixed inset-0 z-20 cursor-default"
+                />
+                <ul
+                  role="menu"
+                  aria-label="Preset teks overlay"
+                  className="absolute left-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 py-1 shadow-xl shadow-black/40"
+                >
+                  {TEXT_PRESETS.map((preset) => (
+                    <li key={preset} role="none">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          addTextOverlay(preset);
+                          setPresetOpen(false);
+                        }}
+                        className="block w-full truncate px-4 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800"
+                      >
+                        {preset}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            title="Tambah gambar PNG atau JPG (maks 5 MB)"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3.5 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-800"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m-7-7h14" />
-          </svg>
-          Tambah Teks
-        </button>
-        <button
-          type="button"
-          onClick={() => imageInputRef.current?.click()}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0 0 21.75 19.5V4.5A1.5 1.5 0 0 0 20.25 3H3.75A1.5 1.5 0 0 0 2.25 4.5v15A1.5 1.5 0 0 0 3.75 21zM11.25 7.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5z"
+              />
+            </svg>
+            Tambah Gambar
+            <span className="rounded bg-slate-800 px-1 py-0.5 text-[10px] font-semibold tracking-wide text-slate-400">
+              PNG·JPG
+            </span>
+          </button>
+          <label htmlFor="overlay-image-input" className="sr-only">
+            Pilih gambar overlay PNG atau JPG
+          </label>
+          <input
+            id="overlay-image-input"
+            ref={imageInputRef}
+            type="file"
+            accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+            aria-label="Pilih gambar overlay PNG atau JPG"
+            className="hidden"
+            onChange={(e) => {
+              handleImageChosen(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </div>
+
+        <span className="mx-1 hidden h-6 w-px bg-slate-800 sm:inline" aria-hidden />
+
+        <div
+          role="group"
+          aria-label="Aksi overlay terpilih"
+          className="flex items-center gap-2"
         >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+          <span aria-live="polite" className="hidden text-xs text-slate-500 md:inline">
+            Dipilih:{" "}
+            <span className="font-medium text-slate-200">
+              {selectedLabel ? `“${selectedLabel}”` : "—"}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => selectedOverlay && resetOverlay(selectedOverlay.id)}
+            disabled={!selectedOverlay}
+            title={
+              selectedOverlay
+                ? `Kembalikan posisi, ukuran, rotasi & transparansi “${selectedLabel}” (isi dipertahankan)`
+                : "Pilih overlay terlebih dahulu"
+            }
+            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0 0 21.75 19.5V4.5A1.5 1.5 0 0 0 20.25 3H3.75A1.5 1.5 0 0 0 2.25 4.5v15A1.5 1.5 0 0 0 3.75 21zM11.25 7.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5z"
-            />
-          </svg>
-          Tambah Gambar
-        </button>
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/png,image/jpeg,.png,.jpg,.jpeg"
-          className="hidden"
-          onChange={(e) => {
-            handleImageChosen(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
-        <span className="mx-1 h-6 w-px bg-slate-200" aria-hidden />
-        <button
-          type="button"
-          onClick={() => selectedOverlay && resetOverlay(selectedOverlay.id)}
-          disabled={!selectedOverlay}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Reset Posisi
-        </button>
-        <button
-          type="button"
-          onClick={() => selectedOverlay && deleteOverlay(selectedOverlay.id)}
-          disabled={!selectedOverlay}
-          className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Hapus Overlay
-        </button>
+            Reset Tampilan
+          </button>
+          <button
+            type="button"
+            onClick={handleToolbarDelete}
+            disabled={!selectedOverlay}
+            title={
+              selectedOverlay
+                ? deleteArmed
+                  ? "Klik sekali lagi untuk menghapus permanen"
+                  : `Hapus “${selectedLabel}” permanen (bisa diurungkan)`
+                : "Pilih overlay terlebih dahulu"
+            }
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              deleteArmed
+                ? "border-red-500 bg-red-600 text-white hover:bg-red-500"
+                : "border-red-500/30 bg-slate-900 text-red-300 hover:bg-red-500/10"
+            }`}
+          >
+            {deleteArmed ? "Yakin hapus?" : "Hapus Overlay"}
+          </button>
+        </div>
       </div>
 
       {error && <ErrorMessage message={error} />}
@@ -772,27 +1057,87 @@ export default function PdfEditor() {
 
       {/* Main */}
       <div className="flex flex-col gap-8 lg:flex-row">
-        <div className="flex min-w-0 flex-1 flex-col items-center gap-5">
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-4">
+          {/* Kontrol zoom */}
+          <div
+            className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900 p-1"
+            role="group"
+            aria-label="Kontrol zoom preview"
+          >
+            <button
+              type="button"
+              onClick={zoomOut}
+              disabled={zoom <= MIN_ZOOM}
+              aria-label="Perkecil preview"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden
+              >
+                <path strokeLinecap="round" d="M5 12h14" />
+              </svg>
+            </button>
+            <span
+              aria-live="polite"
+              className="min-w-14 text-center text-xs font-semibold tabular-nums text-slate-200"
+            >
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              type="button"
+              onClick={zoomIn}
+              disabled={zoom >= MAX_ZOOM}
+              aria-label="Perbesar preview"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden
+              >
+                <path strokeLinecap="round" d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+            <span className="h-5 w-px bg-slate-800" aria-hidden />
+            <button
+              type="button"
+              onClick={zoomFit}
+              disabled={zoom === 1}
+              className="rounded-full px-2.5 py-1 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Fit
+            </button>
+          </div>
           <div
             ref={previewContainerRef}
-            className="flex w-full max-w-3xl flex-col items-center overflow-hidden"
+            className="w-full max-w-3xl overflow-x-auto"
           >
             {isRendering && pageCanvas === null ? (
-              <div className="w-full rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="w-full rounded-2xl border border-slate-800 bg-slate-900">
                 <LoadingState message="Merender halaman..." />
               </div>
             ) : pageSize.width > 0 ? (
-              <PdfPagePreview
-                pageWidth={pageSize.width}
-                pageHeight={pageSize.height}
-                canvas={pageCanvas}
-                overlays={overlays}
-                images={overlayImages}
-                selectedId={selectedOverlayId}
-                onSelect={setSelectedOverlayId}
-                onChange={updateOverlay}
-                onDelete={deleteOverlay}
-              />
+              <div className="mx-auto w-fit">
+                <PdfPagePreview
+                  pageWidth={pageSize.width}
+                  pageHeight={pageSize.height}
+                  canvas={pageCanvas}
+                  overlays={overlays}
+                  images={overlayImages}
+                  selectedId={selectedOverlayId}
+                  onSelect={setSelectedOverlayId}
+                  onChange={updateOverlay}
+                  onDelete={deleteOverlay}
+                />
+              </div>
             ) : null}
           </div>
           <PdfNavigation
@@ -800,11 +1145,28 @@ export default function PdfEditor() {
             totalPages={pdfInfo.totalPages}
             onPrev={() => goToPage(currentPage - 1)}
             onNext={() => goToPage(currentPage + 1)}
+            onGoTo={goToPage}
           />
         </div>
 
-        <aside className="w-full lg:w-72 lg:shrink-0">
-          <div className="flex flex-col gap-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <aside className="flex w-full flex-col gap-4 lg:w-72 lg:shrink-0">
+          <section
+            aria-labelledby="overlay-panel-title"
+            className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5"
+          >
+            <h2
+              id="overlay-panel-title"
+              className="text-sm font-semibold text-slate-100"
+            >
+              Overlay
+            </h2>
+            <OverlayList
+              overlays={overlays}
+              selectedId={selectedOverlayId}
+              onSelect={setSelectedOverlayId}
+              onDelete={deleteOverlay}
+              onToggleVisibility={toggleOverlayVisibility}
+            />
             <div>
               {selectedOverlay ? (
                 <OverlayProperties
@@ -814,32 +1176,81 @@ export default function PdfEditor() {
                   }
                   onDelete={() => deleteOverlay(selectedOverlay.id)}
                   onReset={() => resetOverlay(selectedOverlay.id)}
+                  onToggleVisibility={() =>
+                    toggleOverlayVisibility(selectedOverlay.id)
+                  }
                 />
-              ) : (
+              ) : overlays.length === 0 ? (
                 <button
                   type="button"
-                  onClick={addTextOverlay}
-                  className="flex w-full flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-8 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/40"
+                  onClick={() => addTextOverlay()}
+                  className="flex w-full flex-col items-center gap-3 rounded-xl border border-dashed border-slate-700 bg-slate-950/60 px-4 py-8 text-center transition-colors hover:border-indigo-500/50 hover:bg-indigo-500/5"
                 >
                   <span className="text-xs text-slate-500">
-                    Belum ada overlay dipilih.
+                    Belum ada overlay.
                   </span>
-                  <span className="text-sm font-medium text-slate-700">
-                    Klik di halaman untuk memilih, atau tambahkan overlay baru.
+                  <span className="text-sm font-medium text-slate-300">
+                    Tambahkan teks atau gambar untuk memulai.
                   </span>
                 </button>
+              ) : (
+                <p className="rounded-xl border border-dashed border-slate-700 bg-slate-950/60 px-4 py-5 text-center text-xs leading-relaxed text-slate-500">
+                  Pilih overlay dari daftar atau klik di halaman untuk mengatur
+                  propertinya.
+                </p>
               )}
             </div>
-            <div className="h-px bg-slate-100" aria-hidden />
-            <TemplatePanel
-              templates={templates}
-              activeTemplateId={activeTemplateId}
-              canSave={overlays.length > 0}
-              onSelect={handleSelectTemplate}
-              onSave={handleSaveTemplate}
-              onDelete={handleDeleteTemplate}
-            />
-          </div>
+          </section>
+
+          <section
+            aria-labelledby="template-panel-title"
+            className="rounded-2xl border border-slate-800 bg-slate-900 p-5"
+          >
+            <button
+              type="button"
+              onClick={() => setTemplateOpen((v) => !v)}
+              aria-expanded={templateOpen}
+              aria-controls="template-panel-body"
+              className="flex w-full items-center justify-between gap-2 text-left"
+            >
+              <span
+                id="template-panel-title"
+                className="text-sm font-semibold text-slate-100"
+              >
+                Template
+              </span>
+              <svg
+                className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${templateOpen ? "rotate-180" : ""}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 9l6 6 6-6"
+                />
+              </svg>
+            </button>
+            {templateOpen && (
+              <div id="template-panel-body" className="mt-4">
+                <p className="mb-4 text-xs text-slate-500">
+                  Template aktif diterapkan otomatis saat PDF baru dibuka.
+                </p>
+                <TemplatePanel
+                  templates={templates}
+                  activeTemplateId={activeTemplateId}
+                  canSave={overlays.length > 0}
+                  onSelect={handleSelectTemplate}
+                  onSave={handleSaveTemplate}
+                  onDelete={handleDeleteTemplate}
+                  showHeader={false}
+                />
+              </div>
+            )}
+          </section>
         </aside>
       </div>
 
@@ -870,16 +1281,31 @@ export default function PdfEditor() {
         </div>
       )}
 
-      {isExporting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm">
-          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl bg-white p-8 text-center shadow-xl">
-            <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-slate-200 border-t-indigo-600" />
-            <p className="text-sm font-medium text-slate-800">
-              {exportMessage ?? "Sedang membuat PDF..."}
+      {exportMessage && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-busy="true"
+          aria-labelledby="export-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm"
+        >
+          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl bg-slate-900 p-8 text-center shadow-xl">
+            <div
+              className="h-10 w-10 animate-spin rounded-full border-[3px] border-slate-700 border-t-indigo-400"
+              aria-hidden
+            />
+            <p
+              id="export-dialog-title"
+              ref={exportTitleRef}
+              tabIndex={-1}
+              className="text-sm font-medium text-slate-200 outline-none"
+            >
+              {exportMessage}
             </p>
           </div>
         </div>
       )}
+      <Toast toasts={toasts} onDismiss={dismissToast} />
     </main>
   );
 }

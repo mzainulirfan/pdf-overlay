@@ -11,6 +11,7 @@ export type StoredOverlay = {
   heightRatio: number;
   rotation: Rotation;
   opacity: number;
+  visible?: boolean;
 };
 
 export type OverlayTemplate = {
@@ -36,6 +37,7 @@ export function templateFromOverlays(
       heightRatio: o.heightRatio,
       rotation: o.rotation,
       opacity: o.opacity,
+      visible: o.visible,
     })),
   };
 }
@@ -55,6 +57,7 @@ export function overlayFromStored(
     heightRatio: stored.heightRatio,
     rotation: stored.rotation,
     opacity: stored.opacity,
+    visible: stored.visible ?? true,
     applyMode: "all-pages",
   };
 }

@@ -1,7 +1,7 @@
 export default function ErrorMessage({ message }: { message: string }) {
   return (
     <div
-      className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+      className="flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300"
       role="alert"
     >
       <svg
