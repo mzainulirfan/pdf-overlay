@@ -11,7 +11,7 @@ type TemplatePanelProps = {
   canSave: boolean;
   /** Overlay aktif di canvas (untuk checklist inklusi saat menyimpan). */
   overlays: Overlay[];
-  onSelect: (id: string | null) => void;
+  onSelect: (id: string | null, mode?: "append" | "replace") => void;
   onSave: (name: string, overlayIds?: string[]) => void;
   onDelete: (id: string) => void;
 };
@@ -28,6 +28,8 @@ export default function TemplatePanel({
   onSave,
   onDelete,
 }: TemplatePanelProps) {
+  // Template yang menunggu pilihan Tambahkan/Ganti (bila kanvas tak kosong).
+  const [pendingApplyId, setPendingApplyId] = useState<string | null>(null);
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [name, setName] = useState("");
   // null = semua ikut; Set = hanya ID terpilih yang ikut tersimpan.
@@ -104,13 +106,14 @@ export default function TemplatePanel({
               type="button"
               onClick={() => onSelect(null)}
               aria-pressed={activeTemplateId === null}
+              title="Berhenti menerapkan template otomatis. Overlay di kanvas tidak diubah."
               className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                 activeTemplateId === null
                   ? "border-white bg-white/15 font-medium text-white"
                   : "border-neutral-700 bg-black text-neutral-300 hover:bg-neutral-800"
               }`}
             >
-              Tanpa Template
+              Nonaktifkan template
             </button>
           </li>
           {templates.map((t) => {
@@ -123,10 +126,17 @@ export default function TemplatePanel({
               .join("+");
             const armed = armedDeleteId === t.id;
             return (
-            <li key={t.id} className="flex items-stretch gap-1.5">
+            <li key={t.id} className="flex flex-col gap-1.5">
+              <div className="flex items-stretch gap-1.5">
               <button
                 type="button"
-                onClick={() => onSelect(t.id)}
+                onClick={() => {
+                  if (overlays.length > 0 && activeTemplateId !== t.id) {
+                    setPendingApplyId(t.id);
+                  } else {
+                    onSelect(t.id);
+                  }
+                }}
                 aria-pressed={activeTemplateId === t.id}
                 title={`Terapkan "${t.name}" ke halaman`}
                 className={`flex min-w-0 flex-1 flex-col rounded-lg border px-3 py-2 text-left transition-colors ${
@@ -169,6 +179,44 @@ export default function TemplatePanel({
                   />
                 </svg>
               </button>
+              </div>
+              {pendingApplyId === t.id && (
+                <div className="rounded-lg border border-neutral-700 bg-black/40 p-2.5">
+                  <p className="text-xs text-neutral-400">
+                    Kanvas sudah berisi {overlays.length} overlay. Terapkan
+                    “{t.name}” sebagai:
+                  </p>
+                  <div className="mt-2 flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelect(t.id, "append");
+                        setPendingApplyId(null);
+                      }}
+                      className="flex-1 rounded-lg border border-neutral-700 px-2 py-1.5 text-xs font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
+                    >
+                      Tambahkan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelect(t.id, "replace");
+                        setPendingApplyId(null);
+                      }}
+                      className="flex-1 rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-neutral-300"
+                    >
+                      Ganti semua
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingApplyId(null)}
+                      className="rounded-lg border border-neutral-700 px-2 py-1.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-800"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </div>
+              )}
             </li>
             );
           })}
@@ -197,7 +245,7 @@ export default function TemplatePanel({
           />
           {duplicateName && (
             <p id="template-name-warning" className="text-xs text-amber-300">
-              Nama ini sudah dipakai template lain.
+              Nama ini sudah dipakai — gunakan nama lain.
             </p>
           )}
           <fieldset className="flex flex-col gap-1.5 rounded-lg border border-neutral-800 bg-black/40 p-2.5">
@@ -245,11 +293,17 @@ export default function TemplatePanel({
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={!name.trim() || (includedIds?.size ?? 1) === 0}
-              title={
+              disabled={
+                !name.trim() ||
+                duplicateName ||
                 (includedIds?.size ?? 1) === 0
-                  ? "Pilih minimal satu overlay"
-                  : "Simpan template"
+              }
+              title={
+                duplicateName
+                  ? "Nama sudah dipakai template lain"
+                  : (includedIds?.size ?? 1) === 0
+                    ? "Pilih minimal satu overlay"
+                    : "Simpan template"
               }
               className="flex-1 rounded-lg bg-white px-3 py-2 text-sm font-medium text-black transition-colors hover:bg-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
             >

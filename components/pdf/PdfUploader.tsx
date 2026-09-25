@@ -9,8 +9,8 @@ type PdfUploaderProps = {
 };
 
 const STEPS = [
-  { n: "01", t: "Buka PDF", d: "Drop, pilih, tempel, atau URL." },
-  { n: "02", t: "Atur overlay", d: "Geser & ubah ukuran sekali." },
+  { n: "01", t: "Buka PDF", d: "Seret, pilih, tempel, atau URL." },
+  { n: "02", t: "Susun overlay", d: "Teks, gambar & bentuk bebas diatur." },
   { n: "03", t: "Simpan / Cetak", d: "Otomatis ke semua halaman." },
 ];
 
@@ -22,22 +22,22 @@ const FEATURES = [
   },
   {
     title: "Semua halaman",
-    desc: "Satu overlay berlaku global.",
+    desc: "Overlay berlaku global.",
     icon: "M6 7h11M9 11h8M7 15h10m-7 4h4",
   },
   {
-    title: "Drag & resize",
-    desc: "Geser bebas, terkunci di halaman.",
+    title: "Transformasi penuh",
+    desc: "Geser, putar & zoom.",
     icon: "M15 13l-3-3m0 0-3 3m3-3v8M7 16a4 4 0 0 1-.88-7.903A5 5 0 1 1 15.9 6h.1a5 5 0 0 1 1 9.9",
   },
   {
-    title: "Teks & gambar",
-    desc: "FRAGILE, PNG/JPG transparan.",
+    title: "Teks, gambar & bentuk",
+    desc: "FRAGILE, PNG/JPG, kotak penanda.",
     icon: "M12 5v14m-7-7h14",
   },
   {
-    title: "Template",
-    desc: "Simpan & pakai ulang sekali klik.",
+    title: "Preset & template",
+    desc: "Teks siap pakai, simpan & pakai ulang.",
     icon: "M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z",
   },
   {
@@ -120,9 +120,6 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
             PDF Overlay
           </span>
         </div>
-        <span className="rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs text-neutral-400">
-          Maks 25 MB · 100 hlmn
-        </span>
       </div>
 
       {/* Hero minimal */}
@@ -133,17 +130,21 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
         </div>
 
         <h1 className="mt-5 max-w-2xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
-          Beri tanda <span className="text-white">FRAGILE</span>
+          Beri tanda <span className="text-amber-400">FRAGILE</span>
           <br />
           ke seluruh halaman PDF
         </h1>
         <p className="mt-3 max-w-xl text-base leading-relaxed text-neutral-400">
-          Buka PDF, geser overlay ke posisi pas, simpan atau cetak. Selesai
-          dalam hitungan detik.
+          Buka PDF, susun overlay teks, gambar, atau kotak penanda, lalu
+          simpan atau cetak. Selesai dalam hitungan detik.
         </p>
       </div>
 
-      {/* Dropzone */}
+      {/* Cara membuka: dropzone + tempel + URL dalam satu grup */}
+      <section
+        aria-label="Cara membuka PDF"
+        className="mt-6 flex w-full max-w-3xl flex-col items-center gap-2 rounded-3xl border border-neutral-800/80 bg-black/40 p-3 sm:p-4"
+      >
       <div
         role="group"
         aria-labelledby="pdf-dropzone-title"
@@ -166,7 +167,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
           setIsDragging(false);
           onDrop(e);
         }}
-        className={`mt-8 flex w-full max-w-3xl flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-8 py-10 transition-all duration-200 ${
+        className={`flex w-full flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-8 py-8 transition-all duration-200 ${
           isDragging
             ? "scale-[1.01] border-white bg-white/10"
             : "border-neutral-800 bg-neutral-900/60 hover:border-neutral-700 hover:bg-neutral-900"
@@ -239,12 +240,12 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
         </p>
       )}
 
-      <p className="mt-3 text-xs text-neutral-500">
+      <p className="mt-1 text-xs text-neutral-500">
         Tip: salin file PDF lalu tempel dengan Ctrl+V
       </p>
 
       {/* Buka dari URL */}
-      <div className="mt-3 w-full max-w-3xl">
+      <div className="mt-1 w-full">
         {showUrl ? (
           <form
             id="url-form"
@@ -294,8 +295,9 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
               </button>
             </div>
             <p className="text-xs leading-relaxed text-neutral-500">
-              URL dengan CORS dimuat langsung dari browser. Jika tidak, diambil
-              lewat server (maks ~4,5 MB).
+              Tempel tautan PDF langsung. Jika gagal dibuka, file diambil
+              lewat server (maks ~4,5 MB) — untuk file besar, unduh dulu
+              lalu seret ke sini.
             </p>
           </form>
         ) : (
@@ -326,11 +328,12 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
           </div>
         )}
       </div>
+      </section>
 
       {/* Cara kerja */}
       <section
         aria-labelledby="how-it-works"
-        className="mt-12 w-full max-w-3xl"
+        className="mt-10 w-full max-w-3xl"
       >
         <h2
           id="how-it-works"

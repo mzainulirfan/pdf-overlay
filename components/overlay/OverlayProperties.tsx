@@ -71,18 +71,15 @@ export default function OverlayProperties({
       <label className="flex flex-col gap-1.5">
         <span className="text-xs font-medium text-neutral-400">Nama layer</span>
         <input
-          key={`${overlay.id}-name`}
+          key={overlay.id}
           type="text"
-          defaultValue={overlay.name ?? ""}
+          value={overlay.name ?? ""}
           maxLength={40}
-          onBlur={(e) => {
-            const next = e.target.value.trim();
-            if ((next || undefined) !== (overlay.name ?? undefined)) {
-              onChange({ name: next || undefined });
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next !== (overlay.name ?? "")) {
+              onChange({ name: next.trim() ? next : undefined });
             }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
           }}
           placeholder="Otomatis (ikut isi teks)"
           aria-label="Nama layer overlay"
@@ -117,10 +114,12 @@ export default function OverlayProperties({
           aria-label="Align cepat"
           className="grid grid-cols-3 gap-1"
         >
-          {spots.map((spot) => {
+          {spots.map((spot, spotIndex) => {
             const active =
               Math.abs(overlay.xRatio - spot.x) < 0.01 &&
               Math.abs(overlay.yRatio - spot.y) < 0.01;
+            const row = Math.floor(spotIndex / 3);
+            const col = spotIndex % 3;
             return (
               <button
                 key={spot.label}
@@ -137,10 +136,19 @@ export default function OverlayProperties({
               >
                 <span
                   aria-hidden
-                  className={`h-1.5 w-1.5 rounded-[2px] ${
-                    active ? "bg-black" : "bg-current"
-                  }`}
-                />
+                  className="grid grid-cols-3 gap-[2px]"
+                >
+                  {Array.from({ length: 9 }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`h-1 w-1 rounded-full ${
+                        i === row * 3 + col
+                          ? "bg-current opacity-100"
+                          : "bg-current opacity-25"
+                      }`}
+                    />
+                  ))}
+                </span>
               </button>
             );
           })}
@@ -149,7 +157,7 @@ export default function OverlayProperties({
 
       <label className="flex flex-col gap-1.5">
         <span className="flex items-center justify-between text-xs font-medium text-neutral-400">
-          <span>Transparansi</span>
+          <span>Opasitas</span>
           <span className="font-semibold tabular-nums text-white">
             {Math.round(overlay.opacity * 100)}%
           </span>
@@ -159,9 +167,13 @@ export default function OverlayProperties({
           min={10}
           max={100}
           value={Math.round(overlay.opacity * 100)}
+          aria-describedby="opacity-hint"
           onChange={(e) => onChange({ opacity: Number(e.target.value) / 100 })}
           className="w-full accent-white"
         />
+        <span id="opacity-hint" className="text-[11px] text-neutral-600">
+          100% = pekat. Min 10% agar overlay tetap terlihat.
+        </span>
       </label>
 
       <div className="flex flex-col gap-1.5">

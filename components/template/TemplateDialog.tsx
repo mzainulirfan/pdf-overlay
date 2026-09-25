@@ -11,7 +11,7 @@ type TemplateDialogProps = {
   activeTemplateId: string | null;
   canSave: boolean;
   overlays: Overlay[];
-  onSelect: (id: string | null) => void;
+  onSelect: (id: string | null, mode?: "append" | "replace") => void;
   onSave: (name: string, overlayIds?: string[]) => void;
   onDelete: (id: string) => void;
   onClose: () => void;

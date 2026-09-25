@@ -42,8 +42,15 @@ import PdfPagePreview from "@/components/pdf/PdfPagePreview";
 import OverlayList from "@/components/overlay/OverlayList";
 import OverlayProperties from "@/components/overlay/OverlayProperties";
 import TemplateDialog from "@/components/template/TemplateDialog";
+import ShortcutHelp from "@/components/pdf/ShortcutHelp";
 
 type PdfjsDoc = PDFDocumentProxy;
+
+type DeletedOverlay = {
+  overlay: Overlay;
+  image: HTMLImageElement | null;
+  index: number;
+};
 
 export default function PdfEditor() {
   const [pdfInfo, setPdfInfo] = useState<PdfDocumentInfo | null>(null);
@@ -93,26 +100,42 @@ export default function PdfEditor() {
     [dismissToast],
   );
 
-  const [lastDeleted, setLastDeleted] = useState<{
-    overlay: Overlay;
-    image: HTMLImageElement | null;
-    index: number;
-  } | null>(null);
-  const undoDelete = useCallback(() => {
-    if (!lastDeleted) return;
-    const { overlay, image, index } = lastDeleted;
+  // Tumpukan hapus (maks 10) agar hapus beruntun tetap bisa diurungkan
+  // satu per satu, bukan hanya hapus terakhir.
+  const [deletedStack, setDeletedStack] = useState<DeletedOverlay[]>([]);
+
+  const restoreDeleted = useCallback((deleted: DeletedOverlay) => {
     setOverlays((prev) => {
-      if (prev.some((o) => o.id === overlay.id)) return prev;
+      if (prev.some((o) => o.id === deleted.overlay.id)) return prev;
       const next = [...prev];
-      next.splice(Math.min(index, next.length), 0, overlay);
+      next.splice(Math.min(deleted.index, next.length), 0, deleted.overlay);
       return next;
     });
-    if (image) {
-      setOverlayImages((prev) => ({ ...prev, [overlay.id]: image }));
+    if (deleted.image) {
+      setOverlayImages((prev) => ({
+        ...prev,
+        [deleted.overlay.id]: deleted.image,
+      }));
     }
-    setSelectedOverlayId(overlay.id);
-    setLastDeleted(null);
-  }, [lastDeleted]);
+    setSelectedOverlayId(deleted.overlay.id);
+  }, []);
+
+  const undoDelete = useCallback(() => {
+    const top = deletedStack[deletedStack.length - 1];
+    if (!top) return;
+    setDeletedStack((prev) => prev.slice(0, -1));
+    restoreDeleted(top);
+  }, [deletedStack, restoreDeleted]);
+
+  const undoDeleteById = useCallback(
+    (id: string) => {
+      const found = deletedStack.find((d) => d.overlay.id === id);
+      if (!found) return;
+      setDeletedStack((prev) => prev.filter((d) => d.overlay.id !== id));
+      restoreDeleted(found);
+    },
+    [deletedStack, restoreDeleted],
+  );
 
   const deleteOverlay = useCallback(
     (id: string) => {
@@ -127,19 +150,22 @@ export default function PdfEditor() {
         return next;
       });
       setSelectedOverlayId((prev) => (prev === id ? null : prev));
-      setLastDeleted({ overlay: target, image, index });
+      setDeletedStack((prev) =>
+        [...prev, { overlay: target, image, index }].slice(-10),
+      );
       pushToast("info", "Overlay dihapus.", {
-        action: { label: "Urungkan", onClick: undoDelete },
+        action: { label: "Urungkan", onClick: () => undoDeleteById(id) },
         durationMs: 5000,
       });
     },
-    [overlays, overlayImages, pushToast, undoDelete],
+    [overlays, overlayImages, pushToast, undoDeleteById],
   );
 
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [previewWidth, setPreviewWidth] = useState(720);
   const [zoom, setZoom] = useState(1);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [shortcutOpen, setShortcutOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState(false);
   const exportTitleRef = useRef<HTMLParagraphElement>(null);
 
@@ -222,13 +248,19 @@ export default function PdfEditor() {
   }, []);
 
   const handleSelectTemplate = useCallback(
-    (id: string | null) => {
+    (id: string | null, mode: "append" | "replace" = "append") => {
       setActiveTemplateId(id);
       persistActiveTemplateId(id);
-      if (id) {
-        const template = templates.find((t) => t.id === id);
-        if (template) void applyTemplate(template);
+      if (!id) return;
+      const template = templates.find((t) => t.id === id);
+      if (!template) return;
+      if (mode === "replace") {
+        setOverlays([]);
+        setOverlayImages({});
+        setSelectedOverlayId(null);
+        setDeletedStack([]);
       }
+      void applyTemplate(template);
     },
     [templates, applyTemplate],
   );
@@ -267,8 +299,11 @@ export default function PdfEditor() {
     });
   }, []);
 
-  const handleSelectFile = useCallback(
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  const openPdfFile = useCallback(
     async (file: File) => {
+      setPendingFile(null);
       setError(null);
       const validation = validatePdfFile(file);
       if (!validation.ok) {
@@ -315,7 +350,7 @@ export default function PdfEditor() {
         setOverlays([]);
         setOverlayImages({});
         setSelectedOverlayId(null);
-        setLastDeleted(null);
+        setDeletedStack([]);
         setPdfInfo({
           file,
           fileName: file.name,
@@ -333,6 +368,19 @@ export default function PdfEditor() {
       }
     },
     [templates, activeTemplateId, applyTemplate],
+  );
+
+  const handleSelectFile = useCallback(
+    async (file: File) => {
+      // Dokumen aktif berisi overlay → minta konfirmasi dulu agar kerja
+      // tidak hilang diam-diam (drop/paste/pilih file sama-sama lewat sini).
+      if (pdfInfo && overlays.length > 0) {
+        setPendingFile(file);
+        return;
+      }
+      await openPdfFile(file);
+    },
+    [pdfInfo, overlays, openPdfFile],
   );
 
   useEffect(() => {
@@ -762,7 +810,7 @@ export default function PdfEditor() {
     setOverlayImages({});
     setSelectedOverlayId(null);
     setError(null);
-    setLastDeleted(null);
+    setDeletedStack([]);
   }, []);
 
   useEffect(() => {
@@ -791,6 +839,9 @@ export default function PdfEditor() {
 
       if (e.key === "Escape") {
         setPresetOpen(false);
+        setPendingFile(null);
+        setShortcutOpen(false);
+        if (!isTyping) setSelectedOverlayId(null);
         return;
       }
 
@@ -821,8 +872,13 @@ export default function PdfEditor() {
     );
   }
 
-  const exportDisabled =
-    overlays.every((o) => o.visible === false) || isExporting;
+  const hasVisibleOverlay = overlays.some((o) => o.visible !== false);
+  const exportDisabled = !hasVisibleOverlay || isExporting;
+  const exportDisabledReason = isExporting
+    ? "PDF sedang dibuat, mohon tunggu."
+    : overlays.length === 0
+      ? "Tambahkan overlay terlebih dahulu (Teks / Gambar / Bentuk)."
+      : "Semua overlay disembunyikan — tampilkan minimal satu untuk mengekspor.";
   const selectedOverlay =
     overlays.find((o) => o.id === selectedOverlayId) ?? null;
 
@@ -865,6 +921,15 @@ export default function PdfEditor() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
+              onClick={() => setShortcutOpen(true)}
+              aria-label="Bantuan shortcut keyboard"
+              title="Shortcut keyboard (?)"
+              className="flex h-[38px] w-[38px] items-center justify-center rounded-lg border border-neutral-700 bg-neutral-900 text-sm font-semibold text-neutral-300 transition-colors hover:bg-neutral-800"
+            >
+              ?
+            </button>
+            <button
+              type="button"
               onClick={resetToUpload}
               className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800"
             >
@@ -874,6 +939,7 @@ export default function PdfEditor() {
               type="button"
               onClick={handlePrint}
               disabled={exportDisabled}
+              title={exportDisabled ? exportDisabledReason : "Cetak PDF hasil"}
               className="rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm font-semibold text-neutral-200 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isExporting ? "Membuat PDF..." : "Cetak"}
@@ -882,6 +948,7 @@ export default function PdfEditor() {
               type="button"
               onClick={handleExport}
               disabled={exportDisabled}
+              title={exportDisabled ? exportDisabledReason : "Simpan sebagai PDF baru"}
               className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isExporting ? "Membuat PDF..." : "Simpan PDF"}
@@ -920,7 +987,7 @@ export default function PdfEditor() {
                     >
                       T
                     </span>
-                    Teks
+                    <span className="max-w-28 truncate">FRAGILE</span>
                   </button>
                   <button
                     type="button"
@@ -1040,7 +1107,7 @@ export default function PdfEditor() {
                       ? "Kelola template — 1 template aktif"
                       : `Kelola template — ${templates.length} tersimpan`
                 }
-                className="relative flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-neutral-800"
+                className="relative inline-flex items-center gap-1.5 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-[13px] font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
               >
                 <svg
                   className="h-4 w-4"
@@ -1056,10 +1123,11 @@ export default function PdfEditor() {
                     d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
                   />
                 </svg>
+                Template
                 {templates.length > 0 && (
                   <span
                     aria-hidden
-                    className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold tabular-nums text-black"
+                    className="flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold tabular-nums text-black"
                   >
                     {templates.length}
                   </span>
@@ -1278,20 +1346,69 @@ export default function PdfEditor() {
           </div>
         </div>
       )}
+      {pendingFile && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="replace-pdf-title"
+          aria-describedby="replace-pdf-desc"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-neutral-800 bg-neutral-900 p-5 shadow-xl">
+            <h2
+              id="replace-pdf-title"
+              className="text-sm font-semibold text-neutral-100"
+            >
+              Ganti PDF?
+            </h2>
+            <p
+              id="replace-pdf-desc"
+              className="mt-2 text-sm leading-relaxed text-neutral-400"
+            >
+              {overlays.length} overlay di dokumen ini akan hilang dan tidak
+              bisa dikembalikan. Lanjut buka{" "}
+              <span className="font-medium text-neutral-200">
+                {pendingFile.name}
+              </span>
+              ?
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const next = pendingFile;
+                  if (next) void openPdfFile(next);
+                }}
+                className="flex-1 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-black transition-colors hover:bg-neutral-300"
+              >
+                Ya, ganti
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingFile(null)}
+                className="rounded-lg border border-neutral-700 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <TemplateDialog
         open={templateDialogOpen}
         templates={templates}
         activeTemplateId={activeTemplateId}
         canSave={overlays.length > 0}
         overlays={overlays}
-        onSelect={(id) => {
-          handleSelectTemplate(id);
+        onSelect={(id, mode) => {
+          handleSelectTemplate(id, mode);
           setTemplateDialogOpen(false);
         }}
         onSave={handleSaveTemplate}
         onDelete={handleDeleteTemplate}
         onClose={() => setTemplateDialogOpen(false)}
       />
+      <ShortcutHelp open={shortcutOpen} onClose={() => setShortcutOpen(false)} />
       <Toast toasts={toasts} onDismiss={dismissToast} />
     </main>
   );

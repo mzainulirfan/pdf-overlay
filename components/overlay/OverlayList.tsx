@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Overlay } from "@/types/overlay";
 
 type OverlayListProps = {
@@ -86,6 +86,32 @@ export default function OverlayList({
   // ID overlay yang sedang diseret + posisi drop dalam urutan tampil (0..n).
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropDisplayPos, setDropDisplayPos] = useState<number | null>(null);
+  // Konfirmasi hapus 2-klik: klik pertama arm (memerah), klik kedua eksekusi.
+  const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
+  const armTimerRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (armTimerRef.current) window.clearTimeout(armTimerRef.current);
+    },
+    [],
+  );
+
+  const requestDelete = (id: string) => {
+    if (armedDeleteId === id) {
+      if (armTimerRef.current) window.clearTimeout(armTimerRef.current);
+      armTimerRef.current = null;
+      setArmedDeleteId(null);
+      onDelete(id);
+      return;
+    }
+    if (armTimerRef.current) window.clearTimeout(armTimerRef.current);
+    setArmedDeleteId(id);
+    armTimerRef.current = window.setTimeout(() => {
+      armTimerRef.current = null;
+      setArmedDeleteId(null);
+    }, 3000);
+  };
 
   // Tampil terbalik: baris paling atas = lapisan paling depan,
   // seperti panel Layers di aplikasi desain.
@@ -276,10 +302,22 @@ export default function OverlayList({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onDelete(overlay.id)}
-                  aria-label={`Hapus overlay ${label}`}
-                  title="Hapus"
-                  className={miniDanger}
+                  onClick={() => requestDelete(overlay.id)}
+                  aria-label={
+                    armedDeleteId === overlay.id
+                      ? `Klik sekali lagi untuk menghapus overlay ${label}`
+                      : `Hapus overlay ${label}`
+                  }
+                  title={
+                    armedDeleteId === overlay.id
+                      ? "Klik sekali lagi untuk menghapus"
+                      : "Hapus (bisa diurungkan)"
+                  }
+                  className={
+                    armedDeleteId === overlay.id
+                      ? "flex h-7 w-7 items-center justify-center rounded-md border border-red-500 bg-red-600 text-white transition-colors hover:bg-red-500"
+                      : miniDanger
+                  }
                 >
                   <MiniIcon d={PATHS.x} />
                 </button>

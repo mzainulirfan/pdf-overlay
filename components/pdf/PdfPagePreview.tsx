@@ -99,7 +99,9 @@ export default function PdfPagePreview({
       )}
 
       {overlays
-        .filter((overlay) => overlay.visible !== false)
+        // Yang disembunyikan tetap dirender bila sedang dipilih agar
+        // TransformBox bisa menampilkan placeholder + context bar.
+        .filter((overlay) => overlay.visible !== false || overlay.id === selectedId)
         .map((overlay) => {
           const width = overlay.widthRatio * pageWidth;
           const height = overlay.heightRatio * pageHeight;
