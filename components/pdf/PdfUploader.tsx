@@ -100,7 +100,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
       {/* Top bar minimal */}
       <div className="flex w-full max-w-3xl items-center justify-between py-6">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500 text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-black">
             <svg
               className="h-4.5 w-4.5"
               fill="none"
@@ -116,28 +116,28 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
               />
             </svg>
           </div>
-          <span className="text-sm font-semibold tracking-tight text-slate-100">
+          <span className="text-sm font-semibold tracking-tight text-neutral-100">
             PDF Overlay
           </span>
         </div>
-        <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs text-slate-400">
+        <span className="rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs text-neutral-400">
           Maks 25 MB · 100 hlmn
         </span>
       </div>
 
       {/* Hero minimal */}
       <div className="flex flex-col items-center text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white">
+          <span className="h-1.5 w-1.5 rounded-full bg-white" />
           100% di browser · tanpa upload
         </div>
 
         <h1 className="mt-5 max-w-2xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
-          Beri tanda <span className="text-indigo-400">FRAGILE</span>
+          Beri tanda <span className="text-white">FRAGILE</span>
           <br />
           ke seluruh halaman PDF
         </h1>
-        <p className="mt-3 max-w-xl text-base leading-relaxed text-slate-400">
+        <p className="mt-3 max-w-xl text-base leading-relaxed text-neutral-400">
           Buka PDF, geser overlay ke posisi pas, simpan atau cetak. Selesai
           dalam hitungan detik.
         </p>
@@ -168,16 +168,16 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
         }}
         className={`mt-8 flex w-full max-w-3xl flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-8 py-10 transition-all duration-200 ${
           isDragging
-            ? "scale-[1.01] border-indigo-400 bg-indigo-500/10"
-            : "border-slate-800 bg-slate-900/60 hover:border-slate-700 hover:bg-slate-900"
+            ? "scale-[1.01] border-white bg-white/10"
+            : "border-neutral-800 bg-neutral-900/60 hover:border-neutral-700 hover:bg-neutral-900"
         }`}
       >
         <div
           aria-hidden
           className={`flex h-12 w-12 items-center justify-center rounded-xl transition-colors ${
             isDragging
-              ? "bg-indigo-500 text-white"
-              : "bg-indigo-500/15 text-indigo-300"
+              ? "bg-white text-black"
+              : "bg-white/15 text-white"
           }`}
         >
           <svg
@@ -197,18 +197,18 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
         <div>
           <p
             id="pdf-dropzone-title"
-            className="text-base font-semibold text-slate-100"
+            className="text-base font-semibold text-neutral-100"
           >
             {isDragging ? "Lepaskan file PDF di sini" : "Tarik file PDF ke sini"}
           </p>
-          <p id="pdf-dropzone-hint" className="mt-1 text-sm text-slate-500">
+          <p id="pdf-dropzone-hint" className="mt-1 text-sm text-neutral-500">
             atau pilih dari perangkat dengan tombol di bawah
           </p>
         </div>
         <button
           type="button"
           onClick={openFileDialog}
-          className="rounded-full bg-indigo-500 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+          className="rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-neutral-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black"
         >
           Pilih PDF
         </button>
@@ -239,7 +239,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
         </p>
       )}
 
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-3 text-xs text-neutral-500">
         Tip: salin file PDF lalu tempel dengan Ctrl+V
       </p>
 
@@ -248,7 +248,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
         {showUrl ? (
           <form
             id="url-form"
-            className="flex flex-col items-stretch gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 text-left"
+            className="flex flex-col items-stretch gap-3 rounded-2xl border border-neutral-800 bg-neutral-900 p-4 text-left"
             onSubmit={async (e) => {
               e.preventDefault();
               const trimmed = url.trim();
@@ -262,7 +262,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
             }}
           >
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-slate-400">
+              <span className="text-xs font-medium text-neutral-400">
                 URL file PDF
               </span>
               <input
@@ -271,14 +271,14 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
                 autoFocus
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://contoh.com/dokumen.pdf"
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition-shadow placeholder:text-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
+                className="w-full rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm text-neutral-100 outline-none transition-shadow placeholder:text-neutral-600 focus:border-white focus:ring-2 focus:ring-white/30"
               />
             </label>
             <div className="flex gap-2">
               <button
                 type="submit"
                 disabled={!url.trim() || isUrlLoading}
-                className="flex-1 rounded-lg bg-indigo-500 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex-1 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-black transition-colors hover:bg-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isUrlLoading ? "Mengunduh..." : "Buka PDF"}
               </button>
@@ -288,12 +288,12 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
                   setShowUrl(false);
                   setUrl("");
                 }}
-                className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+                className="rounded-lg border border-neutral-700 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
               >
                 Batal
               </button>
             </div>
-            <p className="text-xs leading-relaxed text-slate-500">
+            <p className="text-xs leading-relaxed text-neutral-500">
               URL dengan CORS dimuat langsung dari browser. Jika tidak, diambil
               lewat server (maks ~4,5 MB).
             </p>
@@ -305,7 +305,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
               onClick={() => setShowUrl(true)}
               aria-expanded={showUrl}
               aria-controls="url-form"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-300 transition-colors hover:text-indigo-200"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-white transition-colors hover:text-neutral-300"
             >
               <svg
                 className="h-4 w-4"
@@ -334,7 +334,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
       >
         <h2
           id="how-it-works"
-          className="text-center text-sm font-semibold tracking-wide text-slate-300 uppercase"
+          className="text-center text-sm font-semibold tracking-wide text-neutral-300 uppercase"
         >
           Cara kerja
         </h2>
@@ -342,13 +342,13 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
           {STEPS.map((s) => (
             <li
               key={s.n}
-              className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-left"
+              className="rounded-xl border border-neutral-800 bg-neutral-900 p-4 text-left"
             >
-              <span className="text-xs font-bold tracking-widest text-indigo-400">
+              <span className="text-xs font-bold tracking-widest text-white">
                 {s.n}
               </span>
-              <p className="mt-1 text-sm font-semibold text-slate-100">{s.t}</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+              <p className="mt-1 text-sm font-semibold text-neutral-100">{s.t}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-neutral-500">
                 {s.d}
               </p>
             </li>
@@ -360,7 +360,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
       <section aria-labelledby="features" className="mt-8 w-full max-w-3xl">
         <h2
           id="features"
-          className="text-center text-sm font-semibold tracking-wide text-slate-300 uppercase"
+          className="text-center text-sm font-semibold tracking-wide text-neutral-300 uppercase"
         >
           Fitur unggulan
         </h2>
@@ -368,10 +368,10 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
           {FEATURES.map((f) => (
             <div
               key={f.title}
-              className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-left"
+              className="rounded-xl border border-neutral-800 bg-neutral-900 p-4 text-left"
             >
               <svg
-                className="h-5 w-5 text-indigo-400"
+                className="h-5 w-5 text-white"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -384,10 +384,10 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
                   d={f.icon}
                 />
               </svg>
-              <p className="mt-2 text-sm font-semibold text-slate-100">
+              <p className="mt-2 text-sm font-semibold text-neutral-100">
                 {f.title}
               </p>
-              <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+              <p className="mt-0.5 text-xs leading-relaxed text-neutral-500">
                 {f.desc}
               </p>
             </div>
@@ -395,7 +395,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
         </div>
       </section>
 
-      <p className="mt-8 text-center text-xs leading-relaxed text-slate-600">
+      <p className="mt-8 text-center text-xs leading-relaxed text-neutral-600">
         PDF maks 25 MB · 100 halaman · .pdf — file perangkat tidak diunggah,
         kecuali via URL non-CORS.
       </p>

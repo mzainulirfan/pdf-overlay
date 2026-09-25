@@ -1,11 +1,11 @@
 export default function SuccessMessage({ message }: { message: string }) {
   return (
     <div
-      className="flex items-start gap-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+      className="flex items-start gap-2.5 rounded-xl border border-neutral-700 bg-white/5 px-4 py-3 text-sm text-neutral-200"
       role="status"
     >
       <svg
-        className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500"
+        className="mt-0.5 h-4 w-4 shrink-0 text-white"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"

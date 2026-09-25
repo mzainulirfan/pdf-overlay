@@ -768,18 +768,6 @@ export default function PdfEditor() {
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 pb-16">
         <PdfUploader onSelect={handleSelectFile} onSelectUrl={handleSelectUrl} />
         {error && <ErrorMessage message={error} />}
-        {templates.length > 0 && (
-          <div className="mx-auto w-full rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <TemplatePanel
-              templates={templates}
-              activeTemplateId={activeTemplateId}
-              canSave={false}
-              onSelect={handleSelectTemplate}
-              onSave={handleSaveTemplate}
-              onDelete={handleDeleteTemplate}
-            />
-          </div>
-        )}
         <Toast toasts={toasts} onDismiss={dismissToast} />
       </main>
     );
@@ -810,10 +798,10 @@ export default function PdfEditor() {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pb-12">
       {/* Header */}
-      <header className="sticky top-0 z-20 -mx-6 border-b border-slate-800 bg-slate-950/85 px-6 py-3 backdrop-blur">
+      <header className="sticky top-0 z-20 -mx-6 border-b border-neutral-800 bg-black/85 px-6 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-white">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-black">
               <svg
                 className="h-5 w-5"
                 fill="none"
@@ -829,15 +817,15 @@ export default function PdfEditor() {
               </svg>
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-semibold text-slate-100">
+              <h1 className="truncate text-sm font-semibold text-neutral-100">
                 {pdfInfo.fileName}
               </h1>
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-neutral-500">
                 <span>{pdfInfo.totalPages} halaman</span>
                 <span aria-hidden>·</span>
                 <span>{(pdfInfo.fileSize / 1024 / 1024).toFixed(2)} MB</span>
                 <span aria-hidden>·</span>
-                <span className="font-medium text-indigo-300">
+                <span className="font-medium text-white">
                   {overlays.length} overlay
                 </span>
               </p>
@@ -847,7 +835,7 @@ export default function PdfEditor() {
             <button
               type="button"
               onClick={resetToUpload}
-              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800"
+              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800"
             >
               Ganti PDF
             </button>
@@ -855,7 +843,7 @@ export default function PdfEditor() {
               type="button"
               onClick={handlePrint}
               disabled={exportDisabled}
-              className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm font-semibold text-neutral-200 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isExporting ? "Membuat PDF..." : "Cetak"}
             </button>
@@ -863,7 +851,7 @@ export default function PdfEditor() {
               type="button"
               onClick={handleExport}
               disabled={exportDisabled}
-              className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isExporting ? "Membuat PDF..." : "Simpan PDF"}
             </button>
@@ -875,9 +863,9 @@ export default function PdfEditor() {
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
         <span
           aria-live="polite"
-          className="order-first mb-1 w-full text-xs text-slate-500 sm:order-last sm:mb-0 sm:ml-auto sm:w-auto"
+          className="order-first mb-1 w-full text-xs text-neutral-500 sm:order-last sm:mb-0 sm:ml-auto sm:w-auto"
         >
-          <span className="font-medium text-indigo-300">
+          <span className="font-medium text-white">
             {overlays.length} overlay
           </span>{" "}
           · berlaku ke semua halaman
@@ -890,7 +878,7 @@ export default function PdfEditor() {
                 type="button"
                 onClick={() => addTextOverlay()}
                 title="Tambah overlay teks FRAGILE"
-                className="inline-flex items-center gap-2 rounded-l-lg bg-indigo-500 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-400"
+                className="inline-flex items-center gap-2 rounded-l-lg bg-white px-3.5 py-2 text-sm font-medium text-black transition-colors hover:bg-neutral-300"
               >
                 <svg
                   className="h-4 w-4"
@@ -911,7 +899,7 @@ export default function PdfEditor() {
                 aria-expanded={presetOpen}
                 aria-label="Pilih preset teks"
                 title="Pilih preset teks"
-                className="rounded-r-lg border-l border-indigo-400/40 bg-indigo-500 px-2 text-white transition-colors hover:bg-indigo-400"
+                className="rounded-r-lg border-l border-black/20 bg-white px-2 text-black transition-colors hover:bg-neutral-300"
               >
                 <svg
                   className={`h-4 w-4 transition-transform ${presetOpen ? "rotate-180" : ""}`}
@@ -937,7 +925,7 @@ export default function PdfEditor() {
                 <ul
                   role="menu"
                   aria-label="Preset teks overlay"
-                  className="absolute left-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 py-1 shadow-xl shadow-black/40"
+                  className="absolute left-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900 py-1 shadow-xl shadow-black/40"
                 >
                   {TEXT_PRESETS.map((preset) => (
                     <li key={preset} role="none">
@@ -948,7 +936,7 @@ export default function PdfEditor() {
                           addTextOverlay(preset);
                           setPresetOpen(false);
                         }}
-                        className="block w-full truncate px-4 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800"
+                        className="block w-full truncate px-4 py-2 text-left text-sm text-neutral-200 transition-colors hover:bg-neutral-800"
                       >
                         {preset}
                       </button>
@@ -962,7 +950,7 @@ export default function PdfEditor() {
             type="button"
             onClick={() => imageInputRef.current?.click()}
             title="Tambah gambar PNG atau JPG (maks 5 MB)"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3.5 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3.5 py-2 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
           >
             <svg
               className="h-4 w-4"
@@ -979,7 +967,7 @@ export default function PdfEditor() {
               />
             </svg>
             Tambah Gambar
-            <span className="rounded bg-slate-800 px-1 py-0.5 text-[10px] font-semibold tracking-wide text-slate-400">
+            <span className="rounded bg-neutral-800 px-1 py-0.5 text-[10px] font-semibold tracking-wide text-neutral-400">
               PNG·JPG
             </span>
           </button>
@@ -1000,16 +988,16 @@ export default function PdfEditor() {
           />
         </div>
 
-        <span className="mx-1 hidden h-6 w-px bg-slate-800 sm:inline" aria-hidden />
+        <span className="mx-1 hidden h-6 w-px bg-neutral-800 sm:inline" aria-hidden />
 
         <div
           role="group"
           aria-label="Aksi overlay terpilih"
           className="flex items-center gap-2"
         >
-          <span aria-live="polite" className="hidden text-xs text-slate-500 md:inline">
+          <span aria-live="polite" className="hidden text-xs text-neutral-500 md:inline">
             Dipilih:{" "}
-            <span className="font-medium text-slate-200">
+            <span className="font-medium text-neutral-200">
               {selectedLabel ? `“${selectedLabel}”` : "—"}
             </span>
           </span>
@@ -1022,7 +1010,7 @@ export default function PdfEditor() {
                 ? `Kembalikan posisi, ukuran, rotasi & transparansi “${selectedLabel}” (isi dipertahankan)`
                 : "Pilih overlay terlebih dahulu"
             }
-            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Reset Tampilan
           </button>
@@ -1040,7 +1028,7 @@ export default function PdfEditor() {
             className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
               deleteArmed
                 ? "border-red-500 bg-red-600 text-white hover:bg-red-500"
-                : "border-red-500/30 bg-slate-900 text-red-300 hover:bg-red-500/10"
+                : "border-red-500/30 bg-neutral-900 text-red-300 hover:bg-red-500/10"
             }`}
           >
             {deleteArmed ? "Yakin hapus?" : "Hapus Overlay"}
@@ -1050,7 +1038,7 @@ export default function PdfEditor() {
 
       {error && <ErrorMessage message={error} />}
 
-      <p className="-mt-2 text-xs text-slate-400">
+      <p className="-mt-2 text-xs text-neutral-400">
         Untuk mengganti file: seret &amp; lepas PDF baru ke sini, atau salin file
         lalu tempel dengan Ctrl+V.
       </p>
@@ -1060,7 +1048,7 @@ export default function PdfEditor() {
         <div className="flex min-w-0 flex-1 flex-col items-center gap-4">
           {/* Kontrol zoom */}
           <div
-            className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900 p-1"
+            className="inline-flex items-center gap-1 rounded-full border border-neutral-800 bg-neutral-900 p-1"
             role="group"
             aria-label="Kontrol zoom preview"
           >
@@ -1069,7 +1057,7 @@ export default function PdfEditor() {
               onClick={zoomOut}
               disabled={zoom <= MIN_ZOOM}
               aria-label="Perkecil preview"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <svg
                 className="h-4 w-4"
@@ -1084,7 +1072,7 @@ export default function PdfEditor() {
             </button>
             <span
               aria-live="polite"
-              className="min-w-14 text-center text-xs font-semibold tabular-nums text-slate-200"
+              className="min-w-14 text-center text-xs font-semibold tabular-nums text-neutral-200"
             >
               {Math.round(zoom * 100)}%
             </span>
@@ -1093,7 +1081,7 @@ export default function PdfEditor() {
               onClick={zoomIn}
               disabled={zoom >= MAX_ZOOM}
               aria-label="Perbesar preview"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <svg
                 className="h-4 w-4"
@@ -1106,12 +1094,12 @@ export default function PdfEditor() {
                 <path strokeLinecap="round" d="M12 5v14M5 12h14" />
               </svg>
             </button>
-            <span className="h-5 w-px bg-slate-800" aria-hidden />
+            <span className="h-5 w-px bg-neutral-800" aria-hidden />
             <button
               type="button"
               onClick={zoomFit}
               disabled={zoom === 1}
-              className="rounded-full px-2.5 py-1 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full px-2.5 py-1 text-xs font-medium text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Fit
             </button>
@@ -1121,7 +1109,7 @@ export default function PdfEditor() {
             className="w-full max-w-3xl overflow-x-auto"
           >
             {isRendering && pageCanvas === null ? (
-              <div className="w-full rounded-2xl border border-slate-800 bg-slate-900">
+              <div className="w-full rounded-2xl border border-neutral-800 bg-neutral-900">
                 <LoadingState message="Merender halaman..." />
               </div>
             ) : pageSize.width > 0 ? (
@@ -1152,11 +1140,11 @@ export default function PdfEditor() {
         <aside className="flex w-full flex-col gap-4 lg:w-72 lg:shrink-0">
           <section
             aria-labelledby="overlay-panel-title"
-            className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5"
+            className="flex flex-col gap-4 rounded-2xl border border-neutral-800 bg-neutral-900 p-5"
           >
             <h2
               id="overlay-panel-title"
-              className="text-sm font-semibold text-slate-100"
+              className="text-sm font-semibold text-neutral-100"
             >
               Overlay
             </h2>
@@ -1184,17 +1172,17 @@ export default function PdfEditor() {
                 <button
                   type="button"
                   onClick={() => addTextOverlay()}
-                  className="flex w-full flex-col items-center gap-3 rounded-xl border border-dashed border-slate-700 bg-slate-950/60 px-4 py-8 text-center transition-colors hover:border-indigo-500/50 hover:bg-indigo-500/5"
+                  className="flex w-full flex-col items-center gap-3 rounded-xl border border-dashed border-neutral-700 bg-black/60 px-4 py-8 text-center transition-colors hover:border-white/40 hover:bg-white/5"
                 >
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-neutral-500">
                     Belum ada overlay.
                   </span>
-                  <span className="text-sm font-medium text-slate-300">
+                  <span className="text-sm font-medium text-neutral-300">
                     Tambahkan teks atau gambar untuk memulai.
                   </span>
                 </button>
               ) : (
-                <p className="rounded-xl border border-dashed border-slate-700 bg-slate-950/60 px-4 py-5 text-center text-xs leading-relaxed text-slate-500">
+                <p className="rounded-xl border border-dashed border-neutral-700 bg-black/60 px-4 py-5 text-center text-xs leading-relaxed text-neutral-500">
                   Pilih overlay dari daftar atau klik di halaman untuk mengatur
                   propertinya.
                 </p>
@@ -1204,7 +1192,7 @@ export default function PdfEditor() {
 
           <section
             aria-labelledby="template-panel-title"
-            className="rounded-2xl border border-slate-800 bg-slate-900 p-5"
+            className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5"
           >
             <button
               type="button"
@@ -1215,12 +1203,12 @@ export default function PdfEditor() {
             >
               <span
                 id="template-panel-title"
-                className="text-sm font-semibold text-slate-100"
+                className="text-sm font-semibold text-neutral-100"
               >
                 Template
               </span>
               <svg
-                className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${templateOpen ? "rotate-180" : ""}`}
+                className={`h-4 w-4 shrink-0 text-neutral-400 transition-transform ${templateOpen ? "rotate-180" : ""}`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -1236,7 +1224,7 @@ export default function PdfEditor() {
             </button>
             {templateOpen && (
               <div id="template-panel-body" className="mt-4">
-                <p className="mb-4 text-xs text-slate-500">
+                <p className="mb-4 text-xs text-neutral-500">
                   Template aktif diterapkan otomatis saat PDF baru dibuka.
                 </p>
                 <TemplatePanel
@@ -1256,8 +1244,8 @@ export default function PdfEditor() {
 
       {/* Drop overlay saat mengganti file */}
       {dropActive && (
-        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-white bg-slate-900/40 px-10 py-8 text-center">
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/50 px-4 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-white bg-neutral-900/40 px-10 py-8 text-center">
             <svg
               className="h-8 w-8 text-white"
               fill="none"
@@ -1287,18 +1275,18 @@ export default function PdfEditor() {
           aria-modal="true"
           aria-busy="true"
           aria-labelledby="export-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 px-4 backdrop-blur-sm"
         >
-          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl bg-slate-900 p-8 text-center shadow-xl">
+          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl bg-neutral-900 p-8 text-center shadow-xl">
             <div
-              className="h-10 w-10 animate-spin rounded-full border-[3px] border-slate-700 border-t-indigo-400"
+              className="h-10 w-10 animate-spin rounded-full border-[3px] border-neutral-700 border-t-white"
               aria-hidden
             />
             <p
               id="export-dialog-title"
               ref={exportTitleRef}
               tabIndex={-1}
-              className="text-sm font-medium text-slate-200 outline-none"
+              className="text-sm font-medium text-neutral-200 outline-none"
             >
               {exportMessage}
             </p>

@@ -15,7 +15,7 @@ type TemplatePanelProps = {
 };
 
 const input =
-  "w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition-shadow placeholder:text-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30";
+  "w-full rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm text-neutral-100 outline-none transition-shadow placeholder:text-neutral-600 focus:border-white focus:ring-2 focus:ring-white/30";
 
 export default function TemplatePanel({
   templates,
@@ -41,15 +41,15 @@ export default function TemplatePanel({
     <div className="flex flex-col gap-4">
       {showHeader && (
         <div>
-          <h2 className="text-sm font-semibold text-slate-100">Template</h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <h2 className="text-sm font-semibold text-neutral-100">Template</h2>
+          <p className="mt-1 text-xs text-neutral-500">
             Template aktif diterapkan otomatis saat PDF baru dibuka.
           </p>
         </div>
       )}
 
       {templates.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-700 bg-slate-950/60 px-3 py-4 text-center text-xs text-slate-500">
+        <p className="rounded-lg border border-dashed border-neutral-700 bg-black/60 px-3 py-4 text-center text-xs text-neutral-500">
           Belum ada template. Atur overlay sekali, lalu simpan agar bisa dipakai
           ulang.
         </p>
@@ -62,8 +62,8 @@ export default function TemplatePanel({
               aria-pressed={activeTemplateId === null}
               className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                 activeTemplateId === null
-                  ? "border-indigo-500 bg-indigo-500/15 font-medium text-indigo-200"
-                  : "border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-800"
+                  ? "border-white bg-white/15 font-medium text-white"
+                  : "border-neutral-700 bg-black text-neutral-300 hover:bg-neutral-800"
               }`}
             >
               Tanpa Template
@@ -78,8 +78,8 @@ export default function TemplatePanel({
                 title={`Terapkan "${t.name}" ke halaman`}
                 className={`flex-1 truncate rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                   activeTemplateId === t.id
-                    ? "border-indigo-500 bg-indigo-500/15 font-medium text-indigo-200"
-                    : "border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-800"
+                    ? "border-white bg-white/15 font-medium text-white"
+                    : "border-neutral-700 bg-black text-neutral-300 hover:bg-neutral-800"
                 }`}
               >
                 {t.name}
@@ -88,7 +88,7 @@ export default function TemplatePanel({
                 type="button"
                 onClick={() => onDelete(t.id)}
                 aria-label={`Hapus template ${t.name}`}
-                className="rounded-lg border border-slate-700 px-2 text-slate-500 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
+                className="rounded-lg border border-neutral-700 px-2 text-neutral-500 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
               >
                 <svg
                   className="h-4 w-4"
@@ -130,7 +130,7 @@ export default function TemplatePanel({
             <button
               type="submit"
               disabled={!name.trim()}
-              className="flex-1 rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 rounded-lg bg-white px-3 py-2 text-sm font-medium text-black transition-colors hover:bg-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Simpan
             </button>
@@ -140,7 +140,7 @@ export default function TemplatePanel({
                 setShowSaveForm(false);
                 setName("");
               }}
-              className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+              className="rounded-lg border border-neutral-700 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
             >
               Batal
             </button>
@@ -158,7 +158,7 @@ export default function TemplatePanel({
               ? "Simpan semua overlay saat ini sebagai template"
               : "Tambahkan overlay terlebih dahulu"
           }
-          className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Simpan sebagai Template
         </button>

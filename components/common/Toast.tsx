@@ -12,9 +12,9 @@ export type ToastData = {
 
 const STYLES: Record<ToastType, string> = {
   success:
-    "border-emerald-500/20 bg-slate-900 text-emerald-200 shadow-lg shadow-black/40",
-  error: "border-red-500/20 bg-slate-900 text-red-200 shadow-lg shadow-black/40",
-  info: "border-slate-700 bg-slate-900 text-slate-200 shadow-lg shadow-black/40",
+    "border-neutral-700 bg-black text-neutral-100 shadow-lg shadow-black/40",
+  error: "border-red-500/20 bg-black text-red-200 shadow-lg shadow-black/40",
+  info: "border-neutral-700 bg-black text-neutral-100 shadow-lg shadow-black/40",
 };
 
 const ICONS: Record<ToastType, React.ReactNode> = {
@@ -42,9 +42,9 @@ const ICONS: Record<ToastType, React.ReactNode> = {
 };
 
 const ICON_COLORS: Record<ToastType, string> = {
-  success: "bg-emerald-100 text-emerald-600",
+  success: "bg-white text-black",
   error: "bg-red-100 text-red-600",
-  info: "bg-indigo-100 text-indigo-600",
+  info: "bg-white text-black",
 };
 
 export default function Toast({
@@ -87,7 +87,7 @@ export default function Toast({
                 t.action?.onClick();
                 onDismiss(t.id);
               }}
-              className="pointer-events-auto shrink-0 rounded-lg bg-indigo-500 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-400"
+              className="pointer-events-auto shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-neutral-300"
             >
               {t.action.label}
             </button>

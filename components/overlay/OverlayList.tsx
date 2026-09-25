@@ -29,7 +29,7 @@ export default function OverlayList({
 
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-xs font-medium text-slate-400">
+      <h3 className="text-xs font-medium text-neutral-400">
         Daftar overlay ({overlays.length})
       </h3>
       <ul className="flex flex-col gap-1.5" aria-label="Daftar overlay">
@@ -46,16 +46,16 @@ export default function OverlayList({
                 title={`Pilih overlay ${label}`}
                 className={`flex min-w-0 flex-1 items-center gap-2 truncate rounded-lg border px-2.5 py-2 text-left text-sm transition-colors ${
                   isSelected
-                    ? "border-indigo-500 bg-indigo-500/15 font-medium text-indigo-200"
-                    : "border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-800"
+                    ? "border-white bg-white/15 font-medium text-white"
+                    : "border-neutral-700 bg-neutral-950 text-neutral-300 hover:bg-neutral-800"
                 } ${isVisible ? "" : "opacity-60"}`}
               >
                 <span
                   aria-hidden
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-bold ${
                     overlay.type === "text"
-                      ? "bg-indigo-500/20 text-indigo-300"
-                      : "bg-emerald-500/20 text-emerald-300"
+                      ? "bg-white/20 text-white"
+                      : "bg-neutral-700/60 text-neutral-300"
                   }`}
                 >
                   {overlay.type === "text" ? "T" : "G"}
@@ -76,8 +76,8 @@ export default function OverlayList({
                 title={isVisible ? "Sembunyikan" : "Tampilkan"}
                 className={`shrink-0 rounded-lg border px-2 transition-colors ${
                   isVisible
-                    ? "border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                    : "border-indigo-500/50 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20"
+                    ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200"
+                    : "border-white/40 bg-white/10 text-white hover:bg-white/20"
                 }`}
               >
                 <svg
@@ -107,7 +107,7 @@ export default function OverlayList({
                 type="button"
                 onClick={() => onDelete(overlay.id)}
                 aria-label={`Hapus overlay ${label}`}
-                className="shrink-0 rounded-lg border border-slate-700 px-2 text-slate-500 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
+                className="shrink-0 rounded-lg border border-neutral-700 px-2 text-neutral-500 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
               >
                 <svg
                   className="h-4 w-4"

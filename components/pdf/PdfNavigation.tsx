@@ -22,7 +22,7 @@ export default function PdfNavigation({
   const [draft, setDraft] = useState<string | null>(null);
 
   const navButton =
-    "flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-300 transition-all disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:border-slate-600 enabled:hover:bg-slate-800 enabled:focus:outline-none enabled:focus:ring-2 enabled:focus:ring-indigo-500";
+    "flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-300 transition-all disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:border-neutral-600 enabled:hover:bg-neutral-800 enabled:focus:outline-none enabled:focus:ring-2 enabled:focus:ring-white";
 
   const commitJump = () => {
     if (draft === null) return;
@@ -32,7 +32,7 @@ export default function PdfNavigation({
   };
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900 p-1">
+    <div className="inline-flex items-center gap-1 rounded-full border border-neutral-800 bg-neutral-900 p-1">
       <button
         type="button"
         onClick={onPrev}
@@ -51,7 +51,7 @@ export default function PdfNavigation({
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
-      <span className="flex select-none items-center gap-1 px-2 text-center text-sm font-medium text-slate-300">
+      <span className="flex select-none items-center gap-1 px-2 text-center text-sm font-medium text-neutral-300">
         <label htmlFor="page-jump-input" className="sr-only">
           Lompat ke halaman 1 sampai {totalPages}
         </label>
@@ -68,9 +68,9 @@ export default function PdfNavigation({
             if (e.key === "Escape") setDraft(null);
           }}
           aria-label={`Halaman saat ini, ketik 1 sampai ${totalPages} lalu Enter`}
-          className="h-7 w-12 rounded-md border border-transparent bg-transparent text-center text-sm font-bold text-slate-100 tabular-nums outline-none transition-colors hover:border-slate-700 focus:border-indigo-500 focus:bg-slate-950 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="h-7 w-12 rounded-md border border-transparent bg-transparent text-center text-sm font-bold text-neutral-100 tabular-nums outline-none transition-colors hover:border-neutral-700 focus:border-white focus:bg-black [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
-        <span className="text-slate-500">/ {totalPages}</span>
+        <span className="text-neutral-500">/ {totalPages}</span>
       </span>
       <button
         type="button"

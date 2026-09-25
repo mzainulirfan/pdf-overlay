@@ -75,7 +75,7 @@ export default function PdfPagePreview({
     <div
       style={{ width: pageWidth, height: pageHeight }}
       onMouseDown={() => onSelect(null)}
-      className="relative select-none overflow-hidden bg-white shadow-xl shadow-black/40 ring-1 ring-slate-800"
+      className="relative select-none overflow-hidden bg-white shadow-xl shadow-black/40 ring-1 ring-neutral-800"
     >
       {pageImageUrl && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -169,8 +169,8 @@ export default function PdfPagePreview({
             <div
               className={`flex h-full w-full items-center justify-center ${
                 isSelected
-                  ? "border-2 border-dashed border-indigo-500"
-                  : "hover:outline hover:outline-2 hover:outline-indigo-300"
+                  ? "border-2 border-dashed border-white"
+                  : "hover:outline hover:outline-2 hover:outline-white"
               }`}
             >
               <OverlayRenderer
