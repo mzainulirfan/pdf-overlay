@@ -5,10 +5,6 @@ import type { Overlay, Rotation } from "@/types/overlay";
 type OverlayPropertiesProps = {
   overlay: Overlay;
   onChange: (patch: Partial<Overlay>) => void;
-  onDelete: () => void;
-  onReset: () => void;
-  onToggleVisibility: () => void;
-  onDuplicate: () => void;
 };
 
 const ROTATIONS: Rotation[] = [0, 90, 180, 270];
@@ -55,12 +51,7 @@ const input =
 export default function OverlayProperties({
   overlay,
   onChange,
-  onDelete,
-  onReset,
-  onToggleVisibility,
-  onDuplicate,
 }: OverlayPropertiesProps) {
-  const isVisible = overlay.visible !== false;
   const spots = alignSpots(overlay);
   const maxXPct = Math.round(Math.max(0, 1 - overlay.widthRatio) * 100);
   const maxYPct = Math.round(Math.max(0, 1 - overlay.heightRatio) * 100);
@@ -222,39 +213,6 @@ export default function OverlayProperties({
           ))}
         </div>
       </label>
-
-      <div className="flex flex-col gap-2 border-t border-neutral-800 pt-4">
-        <button
-          type="button"
-          onClick={onToggleVisibility}
-          aria-pressed={isVisible}
-          className="rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800"
-        >
-          {isVisible ? "Sembunyikan Overlay" : "Tampilkan Overlay"}
-        </button>
-        <button
-          type="button"
-          onClick={onDuplicate}
-          className="rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800"
-        >
-          Duplikat Overlay
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          title="Kembalikan posisi, ukuran, rotasi & transparansi (isi dipertahankan)"
-          className="rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800"
-        >
-          Reset Tampilan
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="rounded-lg border border-red-500/30 bg-black px-3 py-2 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/10"
-        >
-          Hapus Overlay
-        </button>
-      </div>
     </div>
   );
 }

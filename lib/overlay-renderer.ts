@@ -50,6 +50,51 @@ export function renderOverlayToCanvas(
   return canvas;
 }
 
+/**
+ * Membungkus satu paragraf menjadi beberapa baris (greedy word-wrap).
+ * Kata yang sendirian melebihi lebar box dipecah per karakter agar
+ * teks tanpa spasi (mis. "HANDLEWITHCARE") tetap terbungkus.
+ */
+function wrapParagraph(
+  ctx: CanvasRenderingContext2D,
+  paragraph: string,
+  maxWidth: number,
+  fontSize: number,
+): string[] {
+  const words: string[] = [];
+  for (const word of paragraph.split(/\s+/)) {
+    if (!word) continue;
+    if (measureTextWidth(ctx, word, fontSize) <= maxWidth) {
+      words.push(word);
+      continue;
+    }
+    let chunk = "";
+    for (const ch of word) {
+      if (chunk === "" || measureTextWidth(ctx, chunk + ch, fontSize) <= maxWidth) {
+        chunk += ch;
+      } else {
+        words.push(chunk);
+        chunk = ch;
+      }
+    }
+    if (chunk) words.push(chunk);
+  }
+
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const trial = current ? `${current} ${word}` : word;
+    if (!current || measureTextWidth(ctx, trial, fontSize) <= maxWidth) {
+      current = trial;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 function drawText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -58,23 +103,34 @@ function drawText(
 ) {
   const targetWidth = width * 0.94;
   const targetHeight = height * 0.94;
-  const lines = text.split("\n");
-
   const rawLineHeight = 1.2;
-  let fontSize = Math.max(8, targetHeight / Math.max(1, lines.length));
-  let maxLineWidth = 0;
-  for (const line of lines) {
-    maxLineWidth = Math.max(maxLineWidth, measureTextWidth(ctx, line, fontSize));
-  }
-  if (maxLineWidth > targetWidth) {
-    fontSize *= targetWidth / maxLineWidth;
-  }
+  const MIN_FONT = 8;
 
-  const totalHeight = lines.length * fontSize * rawLineHeight;
-  if (totalHeight > targetHeight) {
-    fontSize *= targetHeight / totalHeight;
+  // "\n" manual tetap jadi jeda keras; paragraf kosong jadi baris spasi.
+  const wrapAll = (fontSize: number): string[] =>
+    text
+      .split("\n")
+      .flatMap((p) => (p.trim() === "" ? [""] : wrapParagraph(ctx, p, targetWidth, fontSize)));
+
+  // Cari font terbesar yang muat: bungkus lalu kecilkan hingga pas.
+  let fontSize = Math.max(MIN_FONT, targetHeight);
+  let lines = wrapAll(fontSize);
+  for (let i = 0; i < 60; i++) {
+    let widest = 0;
+    for (const line of lines) {
+      widest = Math.max(widest, measureTextWidth(ctx, line, fontSize));
+    }
+    const fits =
+      widest <= targetWidth &&
+      lines.length * fontSize * rawLineHeight <= targetHeight;
+    if (fits) break;
+    const next = fontSize * 0.94;
+    if (next < MIN_FONT) break;
+    fontSize = next;
+    lines = wrapAll(fontSize);
   }
-  fontSize = Math.max(8, fontSize);
+  fontSize = Math.max(MIN_FONT, fontSize);
+  lines = wrapAll(fontSize);
 
   ctx.font = `700 ${fontSize}px ${FONT_FAMILY}`;
   ctx.textAlign = "center";

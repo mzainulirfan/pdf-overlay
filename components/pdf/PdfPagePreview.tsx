@@ -132,9 +132,11 @@ export default function PdfPagePreview({
         const height = overlay.heightRatio * pageHeight;
         const x = overlay.xRatio * pageWidth;
         const y = overlay.yRatio * pageHeight;
-        // Kunci rasio aspek agar teks/gambar tetap proporsional saat di-resize.
-        // Gambar memakai rasio alami file (menghilangkan dead space letterbox),
-        // teks memakai rasio box saat ini.
+        // Gambar dikunci ke rasio alami file agar tetap proporsional
+        // (sekaligus menghilangkan dead space letterbox).
+        // Teks SENGAJA tidak dikunci: resize bebas mengubah bentuk box
+        // sehingga jumlah baris wrap menyesuaikan (sempit = lebih banyak
+        // baris). Teks tak bisa "gepeng" karena font selalu fit ulang.
         const naturalImage = images[overlay.id];
         const aspectLock =
           overlay.type === "image" &&
@@ -142,7 +144,7 @@ export default function PdfPagePreview({
           naturalImage.width > 0 &&
           naturalImage.height > 0
             ? naturalImage.width / naturalImage.height
-            : true;
+            : false;
 
         return (
           <Rnd

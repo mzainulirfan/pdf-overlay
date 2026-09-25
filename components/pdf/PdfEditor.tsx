@@ -37,7 +37,7 @@ import PdfNavigation from "@/components/pdf/PdfNavigation";
 import PdfPagePreview from "@/components/pdf/PdfPagePreview";
 import OverlayList from "@/components/overlay/OverlayList";
 import OverlayProperties from "@/components/overlay/OverlayProperties";
-import TemplatePanel from "@/components/template/TemplatePanel";
+import TemplateDialog from "@/components/template/TemplateDialog";
 
 type PdfjsDoc = PDFDocumentProxy;
 
@@ -135,7 +135,7 @@ export default function PdfEditor() {
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [previewWidth, setPreviewWidth] = useState(720);
   const [zoom, setZoom] = useState(1);
-  const [templateOpen, setTemplateOpen] = useState(true);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState(false);
   const exportTitleRef = useRef<HTMLParagraphElement>(null);
 
@@ -977,6 +977,42 @@ export default function PdfEditor() {
                   e.target.value = "";
                 }}
               />
+              <button
+                type="button"
+                onClick={() => setTemplateDialogOpen(true)}
+                aria-label={`Kelola template${templates.length > 0 ? `, ${templates.length} tersimpan` : ""}`}
+                title={
+                  templates.length === 0
+                    ? "Kelola template — simpan susunan overlay untuk dipakai ulang"
+                    : activeTemplateId
+                      ? "Kelola template — 1 template aktif"
+                      : `Kelola template — ${templates.length} tersimpan`
+                }
+                className="relative flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-neutral-800"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
+                  />
+                </svg>
+                {templates.length > 0 && (
+                  <span
+                    aria-hidden
+                    className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold tabular-nums text-black"
+                  >
+                    {templates.length}
+                  </span>
+                )}
+              </button>
             </div>
 
             <span className="h-6 w-px bg-neutral-800" aria-hidden />
@@ -1110,12 +1146,6 @@ export default function PdfEditor() {
                   onChange={(patch) =>
                     updateOverlay(selectedOverlay.id, patch)
                   }
-                  onDelete={() => deleteOverlay(selectedOverlay.id)}
-                  onReset={() => resetOverlay(selectedOverlay.id)}
-                  onToggleVisibility={() =>
-                    toggleOverlayVisibility(selectedOverlay.id)
-                  }
-                  onDuplicate={() => duplicateOverlay(selectedOverlay.id)}
                 />
               ) : overlays.length === 0 ? (
                 <button
@@ -1137,56 +1167,6 @@ export default function PdfEditor() {
                 </p>
               )}
             </div>
-          </section>
-
-          <section
-            aria-labelledby="template-panel-title"
-            className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5"
-          >
-            <button
-              type="button"
-              onClick={() => setTemplateOpen((v) => !v)}
-              aria-expanded={templateOpen}
-              aria-controls="template-panel-body"
-              className="flex w-full items-center justify-between gap-2 text-left"
-            >
-              <span
-                id="template-panel-title"
-                className="text-sm font-semibold text-neutral-100"
-              >
-                Template
-              </span>
-              <svg
-                className={`h-4 w-4 shrink-0 text-neutral-200 transition-transform ${templateOpen ? "rotate-180" : ""}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 9l6 6 6-6"
-                />
-              </svg>
-            </button>
-            {templateOpen && (
-              <div id="template-panel-body" className="mt-4">
-                <p className="mb-4 text-xs text-neutral-500">
-                  Template aktif diterapkan otomatis saat PDF baru dibuka.
-                </p>
-                <TemplatePanel
-                  templates={templates}
-                  activeTemplateId={activeTemplateId}
-                  canSave={overlays.length > 0}
-                  onSelect={handleSelectTemplate}
-                  onSave={handleSaveTemplate}
-                  onDelete={handleDeleteTemplate}
-                  showHeader={false}
-                />
-              </div>
-            )}
           </section>
         </aside>
       </div>
@@ -1242,6 +1222,19 @@ export default function PdfEditor() {
           </div>
         </div>
       )}
+      <TemplateDialog
+        open={templateDialogOpen}
+        templates={templates}
+        activeTemplateId={activeTemplateId}
+        canSave={overlays.length > 0}
+        onSelect={(id) => {
+          handleSelectTemplate(id);
+          setTemplateDialogOpen(false);
+        }}
+        onSave={handleSaveTemplate}
+        onDelete={handleDeleteTemplate}
+        onClose={() => setTemplateDialogOpen(false)}
+      />
       <Toast toasts={toasts} onDismiss={dismissToast} />
     </main>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { OverlayTemplate } from "@/types/template";
 
 type TemplatePanelProps = {
@@ -10,8 +10,6 @@ type TemplatePanelProps = {
   onSelect: (id: string | null) => void;
   onSave: (name: string) => void;
   onDelete: (id: string) => void;
-  /** Sembunyikan heading internal bila panel sudah punya judul dari section induk. */
-  showHeader?: boolean;
 };
 
 const input =
@@ -24,10 +22,18 @@ export default function TemplatePanel({
   onSelect,
   onSave,
   onDelete,
-  showHeader = true,
 }: TemplatePanelProps) {
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [name, setName] = useState("");
+  const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
+  const armTimerRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (armTimerRef.current) window.clearTimeout(armTimerRef.current);
+    },
+    [],
+  );
 
   const submitSave = () => {
     const trimmed = name.trim();
@@ -37,24 +43,37 @@ export default function TemplatePanel({
     setShowSaveForm(false);
   };
 
+  const duplicateName =
+    name.trim() !== "" &&
+    templates.some(
+      (t) => t.name.toLowerCase() === name.trim().toLowerCase(),
+    );
+
+  const requestDelete = (id: string) => {
+    if (armedDeleteId === id) {
+      if (armTimerRef.current) window.clearTimeout(armTimerRef.current);
+      armTimerRef.current = null;
+      setArmedDeleteId(null);
+      onDelete(id);
+      return;
+    }
+    if (armTimerRef.current) window.clearTimeout(armTimerRef.current);
+    setArmedDeleteId(id);
+    armTimerRef.current = window.setTimeout(() => {
+      armTimerRef.current = null;
+      setArmedDeleteId(null);
+    }, 3000);
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      {showHeader && (
-        <div>
-          <h2 className="text-sm font-semibold text-neutral-100">Template</h2>
-          <p className="mt-1 text-xs text-neutral-500">
-            Template aktif diterapkan otomatis saat PDF baru dibuka.
-          </p>
-        </div>
-      )}
-
       {templates.length === 0 ? (
         <p className="rounded-lg border border-dashed border-neutral-700 bg-black/60 px-3 py-4 text-center text-xs text-neutral-500">
           Belum ada template. Atur overlay sekali, lalu simpan agar bisa dipakai
           ulang.
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex max-h-64 flex-col gap-1.5 overflow-y-auto pr-0.5" aria-label="Daftar template tersimpan">
           <li>
             <button
               type="button"
@@ -69,26 +88,47 @@ export default function TemplatePanel({
               Tanpa Template
             </button>
           </li>
-          {templates.map((t) => (
+          {templates.map((t) => {
+            const kinds = Array.from(
+              new Set(
+                t.overlays.map((o) => (o.type === "image" ? "G" : "T")),
+              ),
+            )
+              .sort()
+              .join("+");
+            const armed = armedDeleteId === t.id;
+            return (
             <li key={t.id} className="flex items-stretch gap-1.5">
               <button
                 type="button"
                 onClick={() => onSelect(t.id)}
                 aria-pressed={activeTemplateId === t.id}
                 title={`Terapkan "${t.name}" ke halaman`}
-                className={`flex-1 truncate rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                className={`flex min-w-0 flex-1 flex-col rounded-lg border px-3 py-2 text-left transition-colors ${
                   activeTemplateId === t.id
                     ? "border-white bg-white/15 font-medium text-white"
                     : "border-neutral-700 bg-black text-neutral-300 hover:bg-neutral-800"
                 }`}
               >
-                {t.name}
+                <span className="block w-full truncate text-sm">{t.name}</span>
+                <span className="block text-[11px] text-neutral-500">
+                  {t.overlays.length} overlay · {kinds}
+                </span>
               </button>
               <button
                 type="button"
-                onClick={() => onDelete(t.id)}
-                aria-label={`Hapus template ${t.name}`}
-                className="rounded-lg border border-neutral-700 px-2 text-neutral-500 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
+                onClick={() => requestDelete(t.id)}
+                aria-label={
+                  armed
+                    ? `Klik sekali lagi untuk menghapus template ${t.name}`
+                    : `Hapus template ${t.name}`
+                }
+                title={armed ? "Klik sekali lagi untuk menghapus" : "Hapus template"}
+                className={`rounded-lg border px-2 transition-colors ${
+                  armed
+                    ? "border-red-500 bg-red-600 text-white hover:bg-red-500"
+                    : "border-neutral-700 text-neutral-500 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
+                }`}
               >
                 <svg
                   className="h-4 w-4"
@@ -105,7 +145,8 @@ export default function TemplatePanel({
                 </svg>
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
@@ -124,8 +165,16 @@ export default function TemplatePanel({
             autoFocus
             onChange={(e) => setName(e.target.value)}
             placeholder="Nama template, mis. FRAGILE"
+            aria-describedby={
+              duplicateName ? "template-name-warning" : undefined
+            }
             className={input}
           />
+          {duplicateName && (
+            <p id="template-name-warning" className="text-xs text-amber-300">
+              Nama ini sudah dipakai template lain.
+            </p>
+          )}
           <div className="flex gap-2">
             <button
               type="submit"
