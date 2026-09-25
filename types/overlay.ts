@@ -22,6 +22,9 @@ export type Overlay = {
   /** false = disembunyikan dari preview & hasil export. */
   visible: boolean;
 
+  /** true = tidak bisa digeser/di-resize (tetap bisa dihapus). */
+  locked?: boolean;
+
   applyMode: "all-pages";
 };
 

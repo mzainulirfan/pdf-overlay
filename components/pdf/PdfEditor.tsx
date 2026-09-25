@@ -35,7 +35,7 @@ import Toast, { type ToastData } from "@/components/common/Toast";
 import PdfUploader from "@/components/pdf/PdfUploader";
 import PdfNavigation from "@/components/pdf/PdfNavigation";
 import PdfPagePreview from "@/components/pdf/PdfPagePreview";
-import OverlayList, { overlayLabel } from "@/components/overlay/OverlayList";
+import OverlayList from "@/components/overlay/OverlayList";
 import OverlayProperties from "@/components/overlay/OverlayProperties";
 import TemplatePanel from "@/components/template/TemplatePanel";
 
@@ -94,33 +94,6 @@ export default function PdfEditor() {
     image: HTMLImageElement | null;
     index: number;
   } | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const confirmTimerRef = useRef<number | null>(null);
-
-  const clearDeleteConfirm = useCallback(() => {
-    if (confirmTimerRef.current) {
-      window.clearTimeout(confirmTimerRef.current);
-      confirmTimerRef.current = null;
-    }
-    setConfirmDeleteId(null);
-  }, []);
-
-  const armDeleteConfirm = useCallback((id: string) => {
-    if (confirmTimerRef.current) window.clearTimeout(confirmTimerRef.current);
-    setConfirmDeleteId(id);
-    confirmTimerRef.current = window.setTimeout(() => {
-      confirmTimerRef.current = null;
-      setConfirmDeleteId(null);
-    }, 3000);
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (confirmTimerRef.current) window.clearTimeout(confirmTimerRef.current);
-    },
-    [],
-  );
-
   const undoDelete = useCallback(() => {
     if (!lastDeleted) return;
     const { overlay, image, index } = lastDeleted;
@@ -150,19 +123,15 @@ export default function PdfEditor() {
         return next;
       });
       setSelectedOverlayId((prev) => (prev === id ? null : prev));
-      clearDeleteConfirm();
       setLastDeleted({ overlay: target, image, index });
       pushToast("info", "Overlay dihapus.", {
         action: { label: "Urungkan", onClick: undoDelete },
         durationMs: 5000,
       });
     },
-    [overlays, overlayImages, pushToast, undoDelete, clearDeleteConfirm],
+    [overlays, overlayImages, pushToast, undoDelete],
   );
 
-  // Catatan: confirmDeleteId yang basi otomatis inert karena tombol hanya
-  // armed bila id-nya sama dengan overlay yang sedang dipilih, dan timer
-  // 3 detik membersihkannya.
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [previewWidth, setPreviewWidth] = useState(720);
   const [zoom, setZoom] = useState(1);
@@ -340,7 +309,6 @@ export default function PdfEditor() {
         setOverlayImages({});
         setSelectedOverlayId(null);
         setLastDeleted(null);
-        clearDeleteConfirm();
         setPdfInfo({
           file,
           fileName: file.name,
@@ -357,7 +325,7 @@ export default function PdfEditor() {
         setError((err as Error)?.message ?? "File tidak dapat diproses.");
       }
     },
-    [templates, activeTemplateId, applyTemplate, clearDeleteConfirm],
+    [templates, activeTemplateId, applyTemplate],
   );
 
   useEffect(() => {
@@ -538,9 +506,55 @@ export default function PdfEditor() {
 
   const toggleOverlayVisibility = useCallback((id: string) => {
     setOverlays((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, visible: !o.visible } : o)),
+      prev.map((o) =>
+        o.id === id ? { ...o, visible: !(o.visible !== false) } : o,
+      ),
     );
   }, []);
+
+  const toggleOverlayLock = useCallback((id: string) => {
+    setOverlays((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, locked: !o.locked } : o)),
+    );
+  }, []);
+
+  /** Geser urutan overlay (z-order): -1 ke bawah, +1 ke atas. */
+  const moveOverlay = useCallback((id: string, dir: -1 | 1) => {
+    setOverlays((prev) => {
+      const index = prev.findIndex((o) => o.id === id);
+      const target = index + dir;
+      if (index === -1 || target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }, []);
+
+  const duplicateOverlay = useCallback(
+    (id: string) => {
+      const source = overlays.find((o) => o.id === id);
+      if (!source) return;
+      const copy: Overlay = {
+        ...source,
+        id: `overlay-${crypto.randomUUID()}`,
+        // Geser sedikit agar terlihat sebagai salinan.
+        xRatio: Math.min(1 - source.widthRatio, source.xRatio + 0.04),
+        yRatio: Math.min(1 - source.heightRatio, source.yRatio + 0.04),
+      };
+      setOverlays((prev) => {
+        const index = prev.findIndex((o) => o.id === id);
+        const next = [...prev];
+        next.splice(index + 1, 0, copy);
+        return next;
+      });
+      const image = overlayImages[id] ?? null;
+      if (image) {
+        setOverlayImages((prev) => ({ ...prev, [copy.id]: image }));
+      }
+      setSelectedOverlayId(copy.id);
+    },
+    [overlays, overlayImages],
+  );
 
   const resetOverlay = useCallback((id: string) => {
     setOverlays((prev) =>
@@ -712,8 +726,7 @@ export default function PdfEditor() {
     setSelectedOverlayId(null);
     setError(null);
     setLastDeleted(null);
-    clearDeleteConfirm();
-  }, [clearDeleteConfirm]);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -740,7 +753,6 @@ export default function PdfEditor() {
       }
 
       if (e.key === "Escape") {
-        clearDeleteConfirm();
         setPresetOpen(false);
         return;
       }
@@ -760,7 +772,6 @@ export default function PdfEditor() {
     deleteOverlay,
     selectedOverlayId,
     undoDelete,
-    clearDeleteConfirm,
   ]);
 
   if (!pdfInfo || !pdfDoc) {
@@ -777,23 +788,6 @@ export default function PdfEditor() {
     overlays.every((o) => o.visible === false) || isExporting;
   const selectedOverlay =
     overlays.find((o) => o.id === selectedOverlayId) ?? null;
-  const selectedLabel = selectedOverlay
-    ? overlayLabel(
-        selectedOverlay,
-        overlays.findIndex((o) => o.id === selectedOverlay.id),
-      )
-    : null;
-  const deleteArmed =
-    !!selectedOverlay && confirmDeleteId === selectedOverlay.id;
-
-  const handleToolbarDelete = () => {
-    if (!selectedOverlay) return;
-    if (deleteArmed) {
-      deleteOverlay(selectedOverlay.id);
-    } else {
-      armDeleteConfirm(selectedOverlay.id);
-    }
-  };
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pb-12">
@@ -859,183 +853,6 @@ export default function PdfEditor() {
         </div>
       </header>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-        <span
-          aria-live="polite"
-          className="order-first mb-1 w-full text-xs text-neutral-500 sm:order-last sm:mb-0 sm:ml-auto sm:w-auto"
-        >
-          <span className="font-medium text-white">
-            {overlays.length} overlay
-          </span>{" "}
-          · berlaku ke semua halaman
-        </span>
-
-        <div role="group" aria-label="Tambah overlay" className="flex items-center gap-2">
-          <div className="relative">
-            <div className="flex">
-              <button
-                type="button"
-                onClick={() => addTextOverlay()}
-                title="Tambah overlay teks FRAGILE"
-                className="inline-flex items-center gap-2 rounded-l-lg bg-white px-3.5 py-2 text-sm font-medium text-black transition-colors hover:bg-neutral-300"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m-7-7h14" />
-                </svg>
-                Tambah Teks
-              </button>
-              <button
-                type="button"
-                onClick={() => setPresetOpen((v) => !v)}
-                aria-haspopup="menu"
-                aria-expanded={presetOpen}
-                aria-label="Pilih preset teks"
-                title="Pilih preset teks"
-                className="rounded-r-lg border-l border-black/20 bg-white px-2 text-black transition-colors hover:bg-neutral-300"
-              >
-                <svg
-                  className={`h-4 w-4 transition-transform ${presetOpen ? "rotate-180" : ""}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
-            </div>
-            {presetOpen && (
-              <>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  aria-hidden
-                  onClick={() => setPresetOpen(false)}
-                  className="fixed inset-0 z-20 cursor-default"
-                />
-                <ul
-                  role="menu"
-                  aria-label="Preset teks overlay"
-                  className="absolute left-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900 py-1 shadow-xl shadow-black/40"
-                >
-                  {TEXT_PRESETS.map((preset) => (
-                    <li key={preset} role="none">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          addTextOverlay(preset);
-                          setPresetOpen(false);
-                        }}
-                        className="block w-full truncate px-4 py-2 text-left text-sm text-neutral-200 transition-colors hover:bg-neutral-800"
-                      >
-                        {preset}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => imageInputRef.current?.click()}
-            title="Tambah gambar PNG atau JPG (maks 5 MB)"
-            className="inline-flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3.5 py-2 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
-          >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0 0 21.75 19.5V4.5A1.5 1.5 0 0 0 20.25 3H3.75A1.5 1.5 0 0 0 2.25 4.5v15A1.5 1.5 0 0 0 3.75 21zM11.25 7.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5z"
-              />
-            </svg>
-            Tambah Gambar
-            <span className="rounded bg-neutral-800 px-1 py-0.5 text-[10px] font-semibold tracking-wide text-neutral-400">
-              PNG·JPG
-            </span>
-          </button>
-          <label htmlFor="overlay-image-input" className="sr-only">
-            Pilih gambar overlay PNG atau JPG
-          </label>
-          <input
-            id="overlay-image-input"
-            ref={imageInputRef}
-            type="file"
-            accept="image/png,image/jpeg,.png,.jpg,.jpeg"
-            aria-label="Pilih gambar overlay PNG atau JPG"
-            className="hidden"
-            onChange={(e) => {
-              handleImageChosen(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-        </div>
-
-        <span className="mx-1 hidden h-6 w-px bg-neutral-800 sm:inline" aria-hidden />
-
-        <div
-          role="group"
-          aria-label="Aksi overlay terpilih"
-          className="flex items-center gap-2"
-        >
-          <span aria-live="polite" className="hidden text-xs text-neutral-500 md:inline">
-            Dipilih:{" "}
-            <span className="font-medium text-neutral-200">
-              {selectedLabel ? `“${selectedLabel}”` : "—"}
-            </span>
-          </span>
-          <button
-            type="button"
-            onClick={() => selectedOverlay && resetOverlay(selectedOverlay.id)}
-            disabled={!selectedOverlay}
-            title={
-              selectedOverlay
-                ? `Kembalikan posisi, ukuran, rotasi & transparansi “${selectedLabel}” (isi dipertahankan)`
-                : "Pilih overlay terlebih dahulu"
-            }
-            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Reset Tampilan
-          </button>
-          <button
-            type="button"
-            onClick={handleToolbarDelete}
-            disabled={!selectedOverlay}
-            title={
-              selectedOverlay
-                ? deleteArmed
-                  ? "Klik sekali lagi untuk menghapus permanen"
-                  : `Hapus “${selectedLabel}” permanen (bisa diurungkan)`
-                : "Pilih overlay terlebih dahulu"
-            }
-            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-              deleteArmed
-                ? "border-red-500 bg-red-600 text-white hover:bg-red-500"
-                : "border-red-500/30 bg-neutral-900 text-red-300 hover:bg-red-500/10"
-            }`}
-          >
-            {deleteArmed ? "Yakin hapus?" : "Hapus Overlay"}
-          </button>
-        </div>
-      </div>
-
       {error && <ErrorMessage message={error} />}
 
       <p className="-mt-2 text-xs text-neutral-400">
@@ -1046,64 +863,189 @@ export default function PdfEditor() {
       {/* Main */}
       <div className="flex flex-col gap-8 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col items-center gap-4">
-          {/* Kontrol zoom */}
-          <div
-            className="inline-flex items-center gap-1 rounded-full border border-neutral-800 bg-neutral-900 p-1"
-            role="group"
-            aria-label="Kontrol zoom preview"
-          >
-            <button
-              type="button"
-              onClick={zoomOut}
-              disabled={zoom <= MIN_ZOOM}
-              aria-label="Perkecil preview"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+          {/* Floating toolbar: tambah + zoom, menempel saat scroll */}
+          <div className="sticky top-[72px] z-20 flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-neutral-800 bg-black/85 p-1.5 shadow-xl shadow-black/50 backdrop-blur">
+            <div
+              role="group"
+              aria-label="Tambah overlay"
+              className="flex items-center gap-1.5"
             >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden
+              <div className="relative">
+                <div className="flex">
+                  <button
+                    type="button"
+                    onClick={() => addTextOverlay()}
+                    title="Tambah overlay teks FRAGILE"
+                    className="inline-flex items-center gap-1.5 rounded-l-xl bg-white px-3 py-1.5 text-[13px] font-medium text-black transition-colors hover:bg-neutral-300"
+                  >
+                    <span
+                      aria-hidden
+                      className="flex h-4 w-4 items-center justify-center text-sm font-black tracking-tight"
+                    >
+                      T
+                    </span>
+                    Teks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPresetOpen((v) => !v)}
+                    aria-haspopup="menu"
+                    aria-expanded={presetOpen}
+                    aria-label="Pilih preset teks"
+                    title="Pilih preset teks"
+                    className="rounded-r-xl border-l border-black/20 bg-white px-1.5 text-black transition-colors hover:bg-neutral-300"
+                  >
+                    <svg
+                      className={`h-4 w-4 transition-transform ${presetOpen ? "rotate-180" : ""}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                </div>
+                {presetOpen && (
+                  <>
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      aria-hidden
+                      onClick={() => setPresetOpen(false)}
+                      className="fixed inset-0 z-20 cursor-default"
+                    />
+                    <ul
+                      role="menu"
+                      aria-label="Preset teks overlay"
+                      className="absolute left-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900 py-1 shadow-xl shadow-black/40"
+                    >
+                      {TEXT_PRESETS.map((preset) => (
+                        <li key={preset} role="none">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              addTextOverlay(preset);
+                              setPresetOpen(false);
+                            }}
+                            className="block w-full truncate px-4 py-2 text-left text-sm text-neutral-200 transition-colors hover:bg-neutral-800"
+                          >
+                            {preset}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                title="Tambah gambar PNG atau JPG (maks 5 MB)"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-[13px] font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
               >
-                <path strokeLinecap="round" d="M5 12h14" />
-              </svg>
-            </button>
-            <span
-              aria-live="polite"
-              className="min-w-14 text-center text-xs font-semibold tabular-nums text-neutral-200"
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0 0 21.75 19.5V4.5A1.5 1.5 0 0 0 20.25 3H3.75A1.5 1.5 0 0 0 2.25 4.5v15A1.5 1.5 0 0 0 3.75 21zM11.25 7.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5z"
+                  />
+                </svg>
+                Gambar
+              </button>
+              <label htmlFor="overlay-image-input" className="sr-only">
+                Pilih gambar overlay PNG atau JPG
+              </label>
+              <input
+                id="overlay-image-input"
+                ref={imageInputRef}
+                type="file"
+                accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+                aria-label="Pilih gambar overlay PNG atau JPG"
+                className="hidden"
+                onChange={(e) => {
+                  handleImageChosen(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+
+            <span className="h-6 w-px bg-neutral-800" aria-hidden />
+
+            <div
+              role="group"
+              aria-label="Kontrol zoom preview"
+              className="flex items-center gap-0.5"
             >
-              {Math.round(zoom * 100)}%
-            </span>
-            <button
-              type="button"
-              onClick={zoomIn}
-              disabled={zoom >= MAX_ZOOM}
-              aria-label="Perbesar preview"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden
+              <button
+                type="button"
+                onClick={zoomOut}
+                disabled={zoom <= MIN_ZOOM}
+                aria-label="Perkecil preview"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <path strokeLinecap="round" d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
-            <span className="h-5 w-px bg-neutral-800" aria-hidden />
-            <button
-              type="button"
-              onClick={zoomFit}
-              disabled={zoom === 1}
-              className="rounded-full px-2.5 py-1 text-xs font-medium text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Fit
-            </button>
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" d="M5 12h14" />
+                </svg>
+              </button>
+              <span
+                aria-live="polite"
+                className="min-w-12 text-center text-xs font-semibold tabular-nums text-neutral-200"
+              >
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={zoomIn}
+                disabled={zoom >= MAX_ZOOM}
+                aria-label="Perbesar preview"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={zoomFit}
+                disabled={zoom === 1}
+                className="rounded-full px-2 py-1 text-xs font-medium text-neutral-300 transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Fit
+              </button>
+            </div>
           </div>
+
+          <p aria-live="polite" className="-mt-1 text-[11px] text-neutral-500">
+            <span className="font-medium text-white">
+              {overlays.length} overlay
+            </span>{" "}
+            · berlaku ke semua halaman
+          </p>
+
           <div
             ref={previewContainerRef}
             className="w-full max-w-3xl overflow-x-auto"
@@ -1124,17 +1066,20 @@ export default function PdfEditor() {
                   onSelect={setSelectedOverlayId}
                   onChange={updateOverlay}
                   onDelete={deleteOverlay}
+                  onReset={resetOverlay}
                 />
               </div>
             ) : null}
           </div>
-          <PdfNavigation
-            currentPage={currentPage}
-            totalPages={pdfInfo.totalPages}
-            onPrev={() => goToPage(currentPage - 1)}
-            onNext={() => goToPage(currentPage + 1)}
-            onGoTo={goToPage}
-          />
+          <div className="sticky bottom-3 z-10">
+            <PdfNavigation
+              currentPage={currentPage}
+              totalPages={pdfInfo.totalPages}
+              onPrev={() => goToPage(currentPage - 1)}
+              onNext={() => goToPage(currentPage + 1)}
+              onGoTo={goToPage}
+            />
+          </div>
         </div>
 
         <aside className="flex w-full flex-col gap-4 lg:w-72 lg:shrink-0">
@@ -1154,6 +1099,9 @@ export default function PdfEditor() {
               onSelect={setSelectedOverlayId}
               onDelete={deleteOverlay}
               onToggleVisibility={toggleOverlayVisibility}
+              onToggleLock={toggleOverlayLock}
+              onMove={moveOverlay}
+              onDuplicate={duplicateOverlay}
             />
             <div>
               {selectedOverlay ? (
@@ -1167,6 +1115,7 @@ export default function PdfEditor() {
                   onToggleVisibility={() =>
                     toggleOverlayVisibility(selectedOverlay.id)
                   }
+                  onDuplicate={() => duplicateOverlay(selectedOverlay.id)}
                 />
               ) : overlays.length === 0 ? (
                 <button
@@ -1208,7 +1157,7 @@ export default function PdfEditor() {
                 Template
               </span>
               <svg
-                className={`h-4 w-4 shrink-0 text-neutral-400 transition-transform ${templateOpen ? "rotate-180" : ""}`}
+                className={`h-4 w-4 shrink-0 text-neutral-200 transition-transform ${templateOpen ? "rotate-180" : ""}`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"

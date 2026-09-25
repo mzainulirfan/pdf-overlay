@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
 import type { Overlay } from "@/types/overlay";
 import { ratiosFromPixel } from "@/lib/coordinate-converter";
@@ -16,6 +16,7 @@ type PdfPagePreviewProps = {
   onSelect: (id: string | null) => void;
   onChange: (id: string, patch: Partial<Overlay>) => void;
   onDelete: (id: string) => void;
+  onReset: (id: string) => void;
 };
 
 export default function PdfPagePreview({
@@ -28,6 +29,7 @@ export default function PdfPagePreview({
   onSelect,
   onChange,
   onDelete,
+  onReset,
 }: PdfPagePreviewProps) {
   // Mahal untuk PDF besar — hitung sekali per objek canvas, bukan tiap render.
   const pageImageUrl = useMemo(
@@ -50,6 +52,40 @@ export default function PdfPagePreview({
     },
     [],
   );
+
+  // Konfirmasi hapus 2-klik di context bar: klik pertama arm (tombol
+  // memerah), klik kedua eksekusi. Timeout 3 detik membatalkan otomatis.
+  const [armedId, setArmedId] = useState<string | null>(null);
+  const armTimerRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (armTimerRef.current) window.clearTimeout(armTimerRef.current);
+    },
+    [],
+  );
+
+  const disarmDelete = () => {
+    if (armTimerRef.current) {
+      window.clearTimeout(armTimerRef.current);
+      armTimerRef.current = null;
+    }
+    setArmedId(null);
+  };
+
+  const handleBarDelete = (id: string) => {
+    if (armedId === id) {
+      disarmDelete();
+      onDelete(id);
+    } else {
+      if (armTimerRef.current) window.clearTimeout(armTimerRef.current);
+      setArmedId(id);
+      armTimerRef.current = window.setTimeout(() => {
+        armTimerRef.current = null;
+        setArmedId(null);
+      }, 3000);
+    }
+  };
 
   const scheduleLiveChange = (id: string, patch: Partial<Overlay>) => {
     livePatchRef.current = { id, patch };
@@ -114,8 +150,8 @@ export default function PdfPagePreview({
             size={{ width, height }}
             position={{ x, y }}
             bounds="parent"
-            enableResizing={isSelected}
-            disableDragging={false}
+            enableResizing={isSelected && !overlay.locked}
+            disableDragging={!!overlay.locked}
             lockAspectRatio={aspectLock}
             onMouseDown={(e) => {
               e.stopPropagation();
@@ -162,15 +198,19 @@ export default function PdfPagePreview({
             }}
             className="z-10"
             aria-label={
-              overlay.type === "text" ? "Overlay teks, dapat dipindahkan" : "Overlay gambar, dapat dipindahkan"
+              overlay.locked
+                ? `Overlay ${overlay.type === "text" ? "teks" : "gambar"} terkunci`
+                : overlay.type === "text"
+                  ? "Overlay teks, dapat dipindahkan"
+                  : "Overlay gambar, dapat dipindahkan"
             }
             resizeHandleClasses={{ bottomRight: "opacity-100" }}
           >
             <div
               className={`flex h-full w-full items-center justify-center ${
                 isSelected
-                  ? "border-2 border-dashed border-white"
-                  : "hover:outline hover:outline-2 hover:outline-white"
+                  ? "border-2 border-dashed border-amber-400"
+                  : "hover:outline hover:outline-2 hover:outline-amber-400/70"
               }`}
             >
               <OverlayRenderer
@@ -180,27 +220,70 @@ export default function PdfPagePreview({
                 image={images[overlay.id] ?? null}
               />
               {isSelected && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={() => onDelete(overlay.id)}
-                  aria-label="Hapus overlay"
-                  className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-md transition-transform hover:scale-110 hover:bg-red-700"
+                <div
+                  role="toolbar"
+                  aria-label="Aksi cepat overlay terpilih"
+                  className="absolute top-1 left-1/2 z-20 flex max-w-[calc(100%-8px)] -translate-x-1/2 items-center gap-0.5 overflow-hidden rounded-full border border-neutral-700 bg-black/85 py-0.5 pl-0.5 pr-0.5 shadow-lg backdrop-blur"
                 >
-                  <svg
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={() => onReset(overlay.id)}
+                    aria-label="Reset tampilan overlay"
+                    title="Reset tampilan (posisi, ukuran, rotasi & transparansi)"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={() => handleBarDelete(overlay.id)}
+                    aria-label={
+                      armedId === overlay.id
+                        ? "Klik sekali lagi untuk menghapus overlay"
+                        : "Hapus overlay"
+                    }
+                    title={
+                      armedId === overlay.id
+                        ? "Klik sekali lagi untuk menghapus"
+                        : "Hapus overlay (bisa diurungkan)"
+                    }
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors ${
+                      armedId === overlay.id
+                        ? "bg-red-600 text-white hover:bg-red-500"
+                        : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                    }`}
+                  >
+                    <svg
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                      aria-hidden
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
               )}
             </div>
           </Rnd>

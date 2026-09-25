@@ -12,6 +12,7 @@ export type StoredOverlay = {
   rotation: Rotation;
   opacity: number;
   visible?: boolean;
+  locked?: boolean;
 };
 
 export type OverlayTemplate = {
@@ -38,6 +39,7 @@ export function templateFromOverlays(
       rotation: o.rotation,
       opacity: o.opacity,
       visible: o.visible,
+      locked: o.locked ?? false,
     })),
   };
 }
@@ -58,6 +60,7 @@ export function overlayFromStored(
     rotation: stored.rotation,
     opacity: stored.opacity,
     visible: stored.visible ?? true,
+    locked: stored.locked ?? false,
     applyMode: "all-pages",
   };
 }
