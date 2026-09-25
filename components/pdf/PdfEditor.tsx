@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createTextOverlay, type Overlay } from "@/types/overlay";
+import {
+  createShapeOverlay,
+  createTextOverlay,
+  type Overlay,
+} from "@/types/overlay";
 import type { PdfDocumentInfo } from "@/types/pdf";
 import {
   getPdfSource,
@@ -230,9 +234,12 @@ export default function PdfEditor() {
   );
 
   const handleSaveTemplate = useCallback(
-    (name: string) => {
-      if (overlays.length === 0) return;
-      const template = templateFromOverlays(overlays, name);
+    (name: string, overlayIds?: string[]) => {
+      const selected = overlayIds
+        ? overlays.filter((o) => overlayIds.includes(o.id))
+        : overlays;
+      if (selected.length === 0) return;
+      const template = templateFromOverlays(selected, name);
       setTemplates((prev) => {
         const next = [...prev, template];
         persistTemplates(next);
@@ -372,14 +379,20 @@ export default function PdfEditor() {
 
   useEffect(() => {
     let depth = 0;
+    // Seretan internal (reorder overlay) tidak membawa Files — abaikan agar
+    // tidak memicu indikator/drop ganti PDF.
+    const carriesFiles = (e: DragEvent): boolean => {
+      const types = e.dataTransfer?.types;
+      return !!types && Array.from(types).includes("Files");
+    };
     const onDragEnter = (e: DragEvent) => {
-      if (!editorActiveRef.current) return;
+      if (!editorActiveRef.current || !carriesFiles(e)) return;
       e.preventDefault();
       depth += 1;
       setDropActive(true);
     };
     const onDragOver = (e: DragEvent) => {
-      if (!editorActiveRef.current) return;
+      if (!editorActiveRef.current || !carriesFiles(e)) return;
       e.preventDefault();
       if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
     };
@@ -390,6 +403,9 @@ export default function PdfEditor() {
     };
     const onDrop = (e: DragEvent) => {
       if (!editorActiveRef.current) return;
+      // Drop internal (mis. reorder overlay di sidebar) sudah ditangani
+      // targetnya sendiri — jangan diperlakukan sebagai ganti PDF.
+      if (e.defaultPrevented || !carriesFiles(e)) return;
       e.preventDefault();
       depth = 0;
       setDropActive(false);
@@ -457,6 +473,13 @@ export default function PdfEditor() {
 
   const addTextOverlay = useCallback((text?: string) => {
     const overlay = createTextOverlay(text);
+    setOverlays((prev) => [...prev, overlay]);
+    setSelectedOverlayId(overlay.id);
+    setError(null);
+  }, []);
+
+  const addShapeOverlay = useCallback(() => {
+    const overlay = createShapeOverlay();
     setOverlays((prev) => [...prev, overlay]);
     setSelectedOverlayId(overlay.id);
     setError(null);
@@ -530,13 +553,27 @@ export default function PdfEditor() {
     });
   }, []);
 
+  /** Pindahkan overlay ke indeks array tujuan (untuk drag-and-drop). */
+  const moveOverlayTo = useCallback((id: string, toArrayIndex: number) => {
+    setOverlays((prev) => {
+      const from = prev.findIndex((o) => o.id === id);
+      if (from === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(Math.min(Math.max(0, toArrayIndex), next.length), 0, moved);
+      return next;
+    });
+  }, []);
+
   const duplicateOverlay = useCallback(
     (id: string) => {
       const source = overlays.find((o) => o.id === id);
       if (!source) return;
+      const baseName = source.name?.trim();
       const copy: Overlay = {
         ...source,
         id: `overlay-${crypto.randomUUID()}`,
+        name: baseName ? `${baseName} (salinan)`.slice(0, 40) : undefined,
         // Geser sedikit agar terlihat sebagai salinan.
         xRatio: Math.min(1 - source.widthRatio, source.xRatio + 0.04),
         yRatio: Math.min(1 - source.heightRatio, source.yRatio + 0.04),
@@ -855,9 +892,8 @@ export default function PdfEditor() {
 
       {error && <ErrorMessage message={error} />}
 
-      <p className="-mt-2 text-xs text-neutral-400">
-        Untuk mengganti file: seret &amp; lepas PDF baru ke sini, atau salin file
-        lalu tempel dengan Ctrl+V.
+      <p className="-mt-2 text-xs text-neutral-500">
+        Tip: seret PDF baru ke sini atau Ctrl+V untuk mengganti file.
       </p>
 
       {/* Main */}
@@ -961,6 +997,22 @@ export default function PdfEditor() {
                   />
                 </svg>
                 Gambar
+              </button>
+              <button
+                type="button"
+                onClick={addShapeOverlay}
+                title="Tambah persegi hitam (atur transparansi di panel)"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-[13px] font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden
+                >
+                  <rect x="4" y="7" width="16" height="10" rx="1" />
+                </svg>
+                Bentuk
               </button>
               <label htmlFor="overlay-image-input" className="sr-only">
                 Pilih gambar overlay PNG atau JPG
@@ -1103,6 +1155,9 @@ export default function PdfEditor() {
                   onChange={updateOverlay}
                   onDelete={deleteOverlay}
                   onReset={resetOverlay}
+                  onDuplicate={duplicateOverlay}
+                  onToggleLock={toggleOverlayLock}
+                  onToggleVisibility={toggleOverlayVisibility}
                 />
               </div>
             ) : null}
@@ -1137,6 +1192,7 @@ export default function PdfEditor() {
               onToggleVisibility={toggleOverlayVisibility}
               onToggleLock={toggleOverlayLock}
               onMove={moveOverlay}
+              onMoveTo={moveOverlayTo}
               onDuplicate={duplicateOverlay}
             />
             <div>
@@ -1227,6 +1283,7 @@ export default function PdfEditor() {
         templates={templates}
         activeTemplateId={activeTemplateId}
         canSave={overlays.length > 0}
+        overlays={overlays}
         onSelect={(id) => {
           handleSelectTemplate(id);
           setTemplateDialogOpen(false);

@@ -1,13 +1,13 @@
 "use client";
 
-import type { Overlay, Rotation } from "@/types/overlay";
+import { normalizeRotation, type Overlay } from "@/types/overlay";
 
 type OverlayPropertiesProps = {
   overlay: Overlay;
   onChange: (patch: Partial<Overlay>) => void;
 };
 
-const ROTATIONS: Rotation[] = [0, 90, 180, 270];
+const ROTATION_STEP = 5;
 
 type AlignSpot = {
   label: string;
@@ -34,17 +34,6 @@ function alignSpots(overlay: Overlay): AlignSpot[] {
   ];
 }
 
-function commitPercent(
-  raw: string,
-  max: number,
-  apply: (ratio: number) => void,
-) {
-  const parsed = Number.parseFloat(raw);
-  if (!Number.isFinite(parsed)) return;
-  const clamped = Math.min(max, Math.max(0, parsed));
-  apply(clamped / 100);
-}
-
 const input =
   "w-full rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm text-neutral-100 outline-none transition-shadow placeholder:text-neutral-600 focus:border-white focus:ring-2 focus:ring-white/30";
 
@@ -53,22 +42,53 @@ export default function OverlayProperties({
   onChange,
 }: OverlayPropertiesProps) {
   const spots = alignSpots(overlay);
-  const maxXPct = Math.round(Math.max(0, 1 - overlay.widthRatio) * 100);
-  const maxYPct = Math.round(Math.max(0, 1 - overlay.heightRatio) * 100);
+  // Tampilan slider memakai rentang -180..180 (minus = berlawanan jarum jam).
+  const displayDeg =
+    overlay.rotation > 180 ? overlay.rotation - 360 : overlay.rotation;
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-neutral-100">Properti Overlay</h2>
           <p className="mt-1 text-xs text-neutral-500">
-            {overlay.type === "text" ? "Overlay teks" : "Overlay gambar"} ·
-            berlaku ke semua halaman
+            {overlay.type === "text"
+              ? "Overlay teks"
+              : overlay.type === "shape"
+                ? "Overlay bentuk"
+                : "Overlay gambar"}{" "}
+            · berlaku ke semua halaman
           </p>
         </div>
         <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white">
-          {overlay.type === "text" ? "Teks" : "Gambar"}
+          {overlay.type === "text"
+            ? "Teks"
+            : overlay.type === "shape"
+              ? "Bentuk"
+              : "Gambar"}
         </span>
       </div>
+
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-neutral-400">Nama layer</span>
+        <input
+          key={`${overlay.id}-name`}
+          type="text"
+          defaultValue={overlay.name ?? ""}
+          maxLength={40}
+          onBlur={(e) => {
+            const next = e.target.value.trim();
+            if ((next || undefined) !== (overlay.name ?? undefined)) {
+              onChange({ name: next || undefined });
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+          placeholder="Otomatis (ikut isi teks)"
+          aria-label="Nama layer overlay"
+          className={input}
+        />
+      </label>
 
       {overlay.type === "text" && (
         <label className="flex flex-col gap-1.5">
@@ -83,67 +103,19 @@ export default function OverlayProperties({
         </label>
       )}
 
-      {overlay.type === "image" && (
+      {overlay.type !== "text" && (
         <div className="rounded-lg border border-neutral-800 bg-black px-3 py-2 text-xs text-neutral-500">
-          Geser untuk memindah. Gunakan gagang sudut untuk mengubah ukuran
-          sambil menjaga posisi.
+          Geser untuk memindah. Tarik gagang untuk mengubah panjang dan lebar.
+          Atur transparansi lewat slider di bawah.
         </div>
       )}
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-neutral-400">Posisi (%)</span>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="flex items-center gap-1.5">
-            <span className="w-4 shrink-0 text-xs font-semibold text-neutral-500">
-              X
-            </span>
-            <input
-              key={`${overlay.id}-x`}
-              type="number"
-              min={0}
-              max={maxXPct}
-              defaultValue={Math.round(overlay.xRatio * 100)}
-              aria-label="Posisi horizontal dalam persen"
-              onBlur={(e) =>
-                commitPercent(e.target.value, maxXPct, (xRatio) =>
-                  onChange({ xRatio }),
-                )
-              }
-              onKeyDown={(e) => {
-                if (e.key === "Enter")
-                  (e.target as HTMLInputElement).blur();
-              }}
-              className={`${input} tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
-            />
-          </label>
-          <label className="flex items-center gap-1.5">
-            <span className="w-4 shrink-0 text-xs font-semibold text-neutral-500">
-              Y
-            </span>
-            <input
-              key={`${overlay.id}-y`}
-              type="number"
-              min={0}
-              max={maxYPct}
-              defaultValue={Math.round(overlay.yRatio * 100)}
-              aria-label="Posisi vertikal dalam persen"
-              onBlur={(e) =>
-                commitPercent(e.target.value, maxYPct, (yRatio) =>
-                  onChange({ yRatio }),
-                )
-              }
-              onKeyDown={(e) => {
-                if (e.key === "Enter")
-                  (e.target as HTMLInputElement).blur();
-              }}
-              className={`${input} tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
-            />
-          </label>
-        </div>
+        <span className="text-xs font-medium text-neutral-400">Posisi</span>
         <div
           role="group"
           aria-label="Align cepat"
-          className="mt-1 grid grid-cols-3 gap-1"
+          className="grid grid-cols-3 gap-1"
         >
           {spots.map((spot) => {
             const active =
@@ -192,27 +164,63 @@ export default function OverlayProperties({
         />
       </label>
 
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-neutral-400">Rotasi</span>
-        <div className="grid grid-cols-4 gap-2">
-          {ROTATIONS.map((r) => (
+      <div className="flex flex-col gap-1.5">
+        <span className="flex items-center justify-between text-xs font-medium text-neutral-400">
+          <span>Rotasi</span>
+          <span className="flex items-center gap-2">
+            <span className="font-semibold tabular-nums text-white">
+              {displayDeg}°
+            </span>
             <button
-              key={r}
               type="button"
-              onClick={() => onChange({ rotation: r })}
-              aria-pressed={overlay.rotation === r}
-              aria-label={`Rotasi ${r} derajat`}
-              className={`rounded-lg border py-2 text-sm font-medium transition-all ${
-                overlay.rotation === r
-                  ? "border-white bg-white text-black"
-                  : "border-neutral-700 bg-black text-neutral-300 hover:border-neutral-600 hover:bg-neutral-800"
-              }`}
+              onClick={() => onChange({ rotation: 0 })}
+              disabled={displayDeg === 0}
+              title="Kembali ke 0°"
+              className="rounded text-[11px] font-medium text-neutral-500 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
             >
-              {r}°
+              Reset
             </button>
-          ))}
+          </span>
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              onChange({
+                rotation: normalizeRotation(displayDeg - ROTATION_STEP),
+              })
+            }
+            aria-label={`Putar berlawanan arah ${ROTATION_STEP} derajat`}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-700 text-lg leading-none text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white"
+          >
+            −
+          </button>
+          <input
+            type="range"
+            min={-180}
+            max={180}
+            step={1}
+            value={displayDeg}
+            aria-label="Rotasi dalam derajat"
+            onChange={(e) =>
+              onChange({ rotation: normalizeRotation(Number(e.target.value)) })
+            }
+            className="w-full accent-white"
+          />
+          <button
+            type="button"
+            onClick={() =>
+              onChange({
+                rotation: normalizeRotation(displayDeg + ROTATION_STEP),
+              })
+            }
+            aria-label={`Putar searah jarum jam ${ROTATION_STEP} derajat`}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-700 text-lg leading-none text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white"
+          >
+            +
+          </button>
         </div>
-      </label>
+      </div>
     </div>
   );
 }

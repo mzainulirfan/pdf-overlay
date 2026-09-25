@@ -1,8 +1,9 @@
-import type { Overlay, Rotation } from "@/types/overlay";
+import { normalizeRotation, type Overlay, type Rotation } from "@/types/overlay";
 
 /** Bagian overlay yang bisa diserialisasi ke localStorage. */
 export type StoredOverlay = {
-  type: "text" | "image";
+  type: "text" | "image" | "shape";
+  name?: string;
   text?: string;
   imageDataUrl?: string;
   xRatio: number;
@@ -30,6 +31,7 @@ export function templateFromOverlays(
     name,
     overlays: overlays.map((o) => ({
       type: o.type,
+      name: o.name,
       text: o.text,
       imageDataUrl: o.type === "image" ? o.imageUrl : undefined,
       xRatio: o.xRatio,
@@ -51,13 +53,14 @@ export function overlayFromStored(
   return {
     id,
     type: stored.type,
+    name: stored.name,
     text: stored.text,
     imageUrl: stored.imageDataUrl,
     xRatio: stored.xRatio,
     yRatio: stored.yRatio,
     widthRatio: stored.widthRatio,
     heightRatio: stored.heightRatio,
-    rotation: stored.rotation,
+    rotation: normalizeRotation(stored.rotation),
     opacity: stored.opacity,
     visible: stored.visible ?? true,
     locked: stored.locked ?? false,

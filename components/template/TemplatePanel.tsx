@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { Overlay } from "@/types/overlay";
 import type { OverlayTemplate } from "@/types/template";
+import { overlayLabel } from "@/components/overlay/OverlayList";
 
 type TemplatePanelProps = {
   templates: OverlayTemplate[];
   activeTemplateId: string | null;
   canSave: boolean;
+  /** Overlay aktif di canvas (untuk checklist inklusi saat menyimpan). */
+  overlays: Overlay[];
   onSelect: (id: string | null) => void;
-  onSave: (name: string) => void;
+  onSave: (name: string, overlayIds?: string[]) => void;
   onDelete: (id: string) => void;
 };
 
@@ -19,12 +23,15 @@ export default function TemplatePanel({
   templates,
   activeTemplateId,
   canSave,
+  overlays,
   onSelect,
   onSave,
   onDelete,
 }: TemplatePanelProps) {
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [name, setName] = useState("");
+  // null = semua ikut; Set = hanya ID terpilih yang ikut tersimpan.
+  const [includedIds, setIncludedIds] = useState<Set<string> | null>(null);
   const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
   const armTimerRef = useRef<number | null>(null);
 
@@ -35,11 +42,29 @@ export default function TemplatePanel({
     [],
   );
 
+  const openSaveForm = () => {
+    setIncludedIds(new Set(overlays.map((o) => o.id)));
+    setShowSaveForm(true);
+  };
+
+  const toggleInclude = (id: string) => {
+    setIncludedIds((prev) => {
+      const base = prev ?? new Set(overlays.map((o) => o.id));
+      const next = new Set(base);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const submitSave = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    onSave(trimmed);
+    const ids = includedIds ? [...includedIds] : undefined;
+    if (ids && ids.length === 0) return;
+    onSave(trimmed, ids);
     setName("");
+    setIncludedIds(null);
     setShowSaveForm(false);
   };
 
@@ -175,10 +200,57 @@ export default function TemplatePanel({
               Nama ini sudah dipakai template lain.
             </p>
           )}
+          <fieldset className="flex flex-col gap-1.5 rounded-lg border border-neutral-800 bg-black/40 p-2.5">
+            <legend className="px-1 text-[11px] font-medium text-neutral-500">
+              Overlay yang ikut tersimpan
+            </legend>
+            {overlays.map((o, index) => {
+              const checked = includedIds ? includedIds.has(o.id) : true;
+              const hidden = o.visible === false;
+              return (
+                <label
+                  key={o.id}
+                  className={`flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-sm transition-colors hover:bg-neutral-800/60 ${
+                    hidden ? "opacity-60" : ""
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleInclude(o.id)}
+                    className="h-4 w-4 shrink-0 accent-white"
+                  />
+                  <span
+                    aria-hidden
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-neutral-700/60 text-[10px] font-bold text-neutral-300"
+                  >
+                    {o.type === "text"
+                      ? "T"
+                      : o.type === "shape"
+                        ? "B"
+                        : "G"}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-neutral-200">
+                    {overlayLabel(o, index)}
+                  </span>
+                  {hidden && (
+                    <span className="shrink-0 text-[10px] text-neutral-500">
+                      tersembunyi
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+          </fieldset>
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={!name.trim()}
+              disabled={!name.trim() || (includedIds?.size ?? 1) === 0}
+              title={
+                (includedIds?.size ?? 1) === 0
+                  ? "Pilih minimal satu overlay"
+                  : "Simpan template"
+              }
               className="flex-1 rounded-lg bg-white px-3 py-2 text-sm font-medium text-black transition-colors hover:bg-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Simpan
@@ -188,6 +260,7 @@ export default function TemplatePanel({
               onClick={() => {
                 setShowSaveForm(false);
                 setName("");
+                setIncludedIds(null);
               }}
               className="rounded-lg border border-neutral-700 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
             >
@@ -198,7 +271,7 @@ export default function TemplatePanel({
       ) : (
         <button
           type="button"
-          onClick={() => setShowSaveForm(true)}
+          onClick={openSaveForm}
           disabled={!canSave}
           aria-expanded={showSaveForm}
           aria-controls="save-template-form"

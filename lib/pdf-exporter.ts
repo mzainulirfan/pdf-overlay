@@ -28,7 +28,12 @@ export async function exportPdfWithOverlays(
 
   const pages = pdfDoc.getPages();
   const visibleOverlays = overlays.filter((o) => o.visible !== false);
-  const imageCache = new Map<string, Promise<import("pdf-lib").PDFImage>>();
+  type PlacedImage = {
+    image: Promise<import("pdf-lib").PDFImage>;
+    width: number;
+    height: number;
+  };
+  const imageCache = new Map<string, PlacedImage>();
 
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];
@@ -42,24 +47,32 @@ export async function exportPdfWithOverlays(
       const outHeight = Math.max(1, Math.round(box.height));
 
       const cacheKey = `${overlay.id}-${outWidth}x${outHeight}`;
-      let pdfImagePromise = imageCache.get(cacheKey);
-      if (!pdfImagePromise) {
-        const canvas = renderOverlayToCanvas(
+      let placed = imageCache.get(cacheKey);
+      if (!placed) {
+        // Render memakai sudut overlay sehingga canvas berukuran
+        // bounding box konten terotasi (tanpa clipping sudut).
+        const rendered = renderOverlayToCanvas(
           overlay,
           outWidth,
           outHeight,
           images[overlay.id] ?? null,
         );
-        pdfImagePromise = pdfDoc.embedPng(canvasToPngBytes(canvas));
-        imageCache.set(cacheKey, pdfImagePromise);
+        placed = {
+          image: pdfDoc.embedPng(canvasToPngBytes(rendered.canvas)),
+          width: rendered.canvas.width,
+          height: rendered.canvas.height,
+        };
+        imageCache.set(cacheKey, placed);
       }
-      const pdfImage = await pdfImagePromise;
+      const pdfImage = await placed.image;
 
+      // Samakan titik tengah: bbox digambar mengelilingi pusat box
+      // (koordinat PDF memakai titik kiri-bawah sebagai origin).
       page.drawImage(pdfImage, {
-        x: box.x,
-        y: box.y,
-        width: box.width,
-        height: box.height,
+        x: box.x + box.width / 2 - placed.width / 2,
+        y: box.y + box.height / 2 - placed.height / 2,
+        width: placed.width,
+        height: placed.height,
         opacity: 1,
       });
     }

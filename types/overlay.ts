@@ -1,10 +1,19 @@
-export type OverlayType = "text" | "image";
+export type OverlayType = "text" | "image" | "shape";
 
-export type Rotation = 0 | 90 | 180 | 270;
+/** Derajat rotasi bebas, dinormalisasi ke 0–359 via normalizeRotation. */
+export type Rotation = number;
+
+export function normalizeRotation(degrees: number): number {
+  if (!Number.isFinite(degrees)) return 0;
+  return ((degrees % 360) + 360) % 360;
+}
 
 export type Overlay = {
   id: string;
   type: OverlayType;
+
+  /** Nama kustom layer; kosong = ikut isi/nomor otomatis. */
+  name?: string;
 
   text?: string;
   imageUrl?: string;
@@ -29,6 +38,21 @@ export type Overlay = {
 };
 
 export const DEFAULT_OVERLAY_TEXT = "FRAGILE";
+
+export function createShapeOverlay(): Overlay {
+  return {
+    id: `overlay-${crypto.randomUUID()}`,
+    type: "shape",
+    xRatio: 0.35,
+    yRatio: 0.45,
+    widthRatio: 0.3,
+    heightRatio: 0.15,
+    rotation: 0,
+    opacity: 0.5,
+    visible: true,
+    applyMode: "all-pages",
+  };
+}
 
 export function createTextOverlay(
   text: string = DEFAULT_OVERLAY_TEXT,

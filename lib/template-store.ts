@@ -1,4 +1,5 @@
 import type { OverlayTemplate, StoredOverlay } from "@/types/template";
+import { normalizeRotation } from "@/types/overlay";
 
 const STORAGE_KEY = "pdf-overlay-templates";
 const ACTIVE_KEY = "pdf-overlay-active-template";
@@ -18,7 +19,7 @@ function normalizeTemplate(raw: unknown): OverlayTemplate | null {
     return { ...base, overlays: t.overlays as StoredOverlay[] };
   }
 
-  if (t.type === "text" || t.type === "image") {
+  if (t.type === "text" || t.type === "image" || t.type === "shape") {
     const stored: StoredOverlay = {
       type: t.type,
       text: typeof t.text === "string" ? t.text : undefined,
@@ -27,7 +28,10 @@ function normalizeTemplate(raw: unknown): OverlayTemplate | null {
       yRatio: Number(t.yRatio) || 0.45,
       widthRatio: Number(t.widthRatio) || 0.25,
       heightRatio: Number(t.heightRatio) || 0.1,
-      rotation: (t.rotation as StoredOverlay["rotation"]) ?? 0,
+      rotation:
+        typeof t.rotation === "number"
+          ? normalizeRotation(t.rotation)
+          : 0,
       opacity: typeof t.opacity === "number" ? t.opacity : 1,
     };
     return { ...base, overlays: [stored] };

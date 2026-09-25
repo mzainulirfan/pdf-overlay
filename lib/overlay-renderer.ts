@@ -1,4 +1,6 @@
 import type { Overlay } from "@/types/overlay";
+import { normalizeRotation } from "@/types/overlay";
+import { rotatedBBox } from "@/lib/coordinate-converter";
 
 const FONT_FAMILY = '"Arial", "Helvetica Neue", Helvetica, system-ui, sans-serif';
 
@@ -12,31 +14,43 @@ export async function loadImageFromOverlay(overlay: Overlay): Promise<HTMLImageE
   return img;
 }
 
+export type RenderedOverlay = {
+  canvas: HTMLCanvasElement;
+  /** Offset kiri-atas canvas relatif ke kiri-atas box (bisa negatif bila miring). */
+  dx: number;
+  dy: number;
+};
+
 /**
- * Merender overlay (teks atau gambar) ke sebuah canvas berukuran outWidth x outHeight.
+ * Merender overlay ke canvas seukuran bounding box konten terotasi.
  * Fungsi ini dipakai untuk preview maupun export sehingga hasilnya konsisten.
- * Konten diputar di sekitar pusat kotak overlay.
+ * Rotasi 0° menghasilkan canvas tepat seukuran box (dx = dy = 0).
  */
 export function renderOverlayToCanvas(
   overlay: Overlay,
   outWidth: number,
   outHeight: number,
   image?: HTMLImageElement | null,
-): HTMLCanvasElement {
+): RenderedOverlay {
   const width = Math.max(1, Math.round(outWidth));
   const height = Math.max(1, Math.round(outHeight));
+  const rotation = normalizeRotation(overlay.rotation);
+
+  const bb = rotatedBBox(width, height, rotation);
+  const bw = Math.max(1, Math.round(bb.width));
+  const bh = Math.max(1, Math.round(bb.height));
 
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = bw;
+  canvas.height = bh;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
+  if (!ctx) return { canvas, dx: 0, dy: 0 };
 
   ctx.save();
   ctx.globalAlpha = Math.min(1, Math.max(0.1, overlay.opacity));
 
-  const rad = (overlay.rotation * Math.PI) / 180;
-  ctx.translate(width / 2, height / 2);
+  const rad = (rotation * Math.PI) / 180;
+  ctx.translate(bw / 2, bh / 2);
   ctx.rotate(rad);
   ctx.translate(-width / 2, -height / 2);
 
@@ -44,10 +58,12 @@ export function renderOverlayToCanvas(
     drawText(ctx, overlay.text || "", width, height);
   } else if (overlay.type === "image") {
     drawImage(ctx, image, width, height);
+  } else if (overlay.type === "shape") {
+    drawShape(ctx, width, height);
   }
 
   ctx.restore();
-  return canvas;
+  return { canvas, dx: (width - bw) / 2, dy: (height - bh) / 2 };
 }
 
 /**
@@ -142,6 +158,19 @@ function drawText(
   lines.forEach((line, index) => {
     ctx.fillText(line, width / 2, startY + index * lineHeight);
   });
+}
+
+/**
+ * Persegi hitam penuh seukuran box. Transparansi diatur lewat
+ * globalAlpha (slider opacity overlay) sehingga bisa tembus pandang.
+ */
+function drawShape(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+) {
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, width, height);
 }
 
 function measureTextWidth(

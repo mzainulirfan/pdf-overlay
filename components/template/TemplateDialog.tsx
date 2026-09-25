@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import TemplatePanel from "@/components/template/TemplatePanel";
+import type { Overlay } from "@/types/overlay";
 import type { OverlayTemplate } from "@/types/template";
 
 type TemplateDialogProps = {
@@ -9,8 +10,9 @@ type TemplateDialogProps = {
   templates: OverlayTemplate[];
   activeTemplateId: string | null;
   canSave: boolean;
+  overlays: Overlay[];
   onSelect: (id: string | null) => void;
-  onSave: (name: string) => void;
+  onSave: (name: string, overlayIds?: string[]) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
 };
@@ -20,6 +22,7 @@ export default function TemplateDialog({
   templates,
   activeTemplateId,
   canSave,
+  overlays,
   onSelect,
   onSave,
   onDelete,
@@ -138,6 +141,7 @@ export default function TemplateDialog({
             templates={templates}
             activeTemplateId={activeTemplateId}
             canSave={canSave}
+            overlays={overlays}
             onSelect={onSelect}
             onSave={onSave}
             onDelete={onDelete}
