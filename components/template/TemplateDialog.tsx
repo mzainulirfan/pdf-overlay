@@ -96,11 +96,11 @@ export default function TemplateDialog({
         tabIndex={-1}
         aria-hidden
         onClick={onClose}
-        className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm"
+        className="animate-fade-in absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm"
       />
       <div
         ref={panelRef}
-        className="relative max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-neutral-800 bg-neutral-900 p-5 shadow-xl"
+        className="animate-pop-in relative max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-neutral-800 bg-neutral-900 p-5 shadow-xl"
       >
         <div className="flex items-start justify-between gap-3">
           <h2

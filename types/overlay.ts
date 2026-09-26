@@ -1,5 +1,7 @@
 export type OverlayType = "text" | "image" | "shape";
 
+export type TextCase = "none" | "upper" | "lower" | "capitalize";
+
 export type ShapeKind = "rect" | "ellipse" | "line" | "arrow";
 
 export type ShapeFillMode = "solid" | "outline";
@@ -24,6 +26,13 @@ export type Overlay = {
   text?: string;
   imageUrl?: string;
   imageBytes?: ArrayBuffer;
+
+  /** Gaya font teks (default: bold, tidak miring, tanpa coret). */
+  bold?: boolean;
+  italic?: boolean;
+  strikethrough?: boolean;
+  /** Kapitalisasi tampilan teks (default: apa adanya). */
+  textCase?: TextCase;
 
   /** Jenis bentuk (hanya untuk type "shape"). */
   shape?: ShapeKind;

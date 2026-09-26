@@ -154,6 +154,118 @@ type OverlayPropertiesProps = {
   onChange: (patch: Partial<Overlay>) => void;
 };
 
+/** Panel ringkas saat >1 overlay dipilih: hanya aksi massal yang aman. */
+export function BulkOverlayProperties({
+  selected,
+  onBulkOpacity,
+  onBulkRotateBy,
+  onBulkVisibility,
+  onBulkLock,
+  onBulkDelete,
+}: {
+  selected: Overlay[];
+  onBulkOpacity: (value: number) => void;
+  onBulkRotateBy: (delta: number) => void;
+  onBulkVisibility: () => void;
+  onBulkLock: () => void;
+  onBulkDelete: () => void;
+}) {
+  const opacities = new Set(selected.map((o) => Math.round(o.opacity * 100)));
+  const rotations = new Set(selected.map((o) => o.rotation));
+  const allVisible = selected.every((o) => o.visible !== false);
+  const allLocked = selected.every((o) => !!o.locked);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-neutral-500">
+          {selected.length} overlay dipilih · berlaku ke semua halaman
+        </p>
+        <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white">
+          Bulk
+        </span>
+      </div>
+
+      <label className="flex flex-col gap-1.5">
+        <span className="flex items-center justify-between text-xs font-medium text-neutral-400">
+          <span>Opasitas</span>
+          <span className="font-semibold tabular-nums text-white">
+            {opacities.size === 1 ? `${[...opacities][0]}%` : "Campuran"}
+          </span>
+        </span>
+        <input
+          type="range"
+          min={10}
+          max={100}
+          value={opacities.size === 1 ? [...opacities][0] : 100}
+          aria-label="Opasitas semua overlay terpilih"
+          onChange={(e) => onBulkOpacity(Number(e.target.value) / 100)}
+          className="w-full accent-white"
+        />
+      </label>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="flex items-center justify-between text-xs font-medium text-neutral-400">
+          <span>Rotasi</span>
+          <span className="font-semibold tabular-nums text-white">
+            {rotations.size === 1
+              ? `${(() => {
+                  const r = [...rotations][0];
+                  return r > 180 ? r - 360 : r;
+                })()}°`
+              : "Campuran"}
+          </span>
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onBulkRotateBy(-ROTATION_STEP)}
+            aria-label={`Putar semua berlawanan arah ${ROTATION_STEP} derajat`}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-700 text-lg leading-none text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => onBulkRotateBy(ROTATION_STEP)}
+            aria-label={`Putar semua searah jarum jam ${ROTATION_STEP} derajat`}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-700 text-lg leading-none text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white"
+          >
+            +
+          </button>
+          <span className="text-[11px] text-neutral-600">
+            Berlaku ke semua yang dipilih
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 border-t border-neutral-800 pt-4">
+        <button
+          type="button"
+          onClick={onBulkVisibility}
+          className="rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800"
+        >
+          {allVisible ? "Sembunyikan semua" : "Tampilkan semua"}
+        </button>
+        <button
+          type="button"
+          onClick={onBulkLock}
+          className="rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800"
+        >
+          {allLocked ? "Buka kunci semua" : "Kunci semua"}
+        </button>
+        <button
+          type="button"
+          onClick={onBulkDelete}
+          className="rounded-lg border border-red-500/30 bg-black px-3 py-2 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/10"
+        >
+          Hapus yang dipilih ({selected.length})
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const ROTATION_STEP = 5;
 
 type AlignSpot = {
@@ -194,19 +306,16 @@ export default function OverlayProperties({
     overlay.rotation > 180 ? overlay.rotation - 360 : overlay.rotation;
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-neutral-100">Properti Overlay</h2>
-          <p className="mt-1 text-xs text-neutral-500">
-            {overlay.type === "text"
-              ? "Overlay teks"
-              : overlay.type === "shape"
-                ? "Overlay bentuk"
-                : "Overlay gambar"}{" "}
-            · berlaku ke semua halaman
-          </p>
-        </div>
-        <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-neutral-500">
+          {overlay.type === "text"
+            ? "Overlay teks"
+            : overlay.type === "shape"
+              ? "Overlay bentuk"
+              : "Overlay gambar"}{" "}
+          · berlaku ke semua halaman
+        </p>
+        <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white">
           {overlay.type === "text"
             ? "Teks"
             : overlay.type === "shape"
@@ -215,40 +324,124 @@ export default function OverlayProperties({
         </span>
       </div>
 
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-neutral-400">Nama layer</span>
-        <input
-          key={overlay.id}
-          type="text"
-          value={overlay.name ?? ""}
-          maxLength={40}
-          onChange={(e) => {
-            const next = e.target.value;
-            if (next !== (overlay.name ?? "")) {
-              onChange({ name: next.trim() ? next : undefined });
-            }
-          }}
-          placeholder="Otomatis (ikut isi teks)"
-          aria-label="Nama layer overlay"
-          className={input}
-        />
-      </label>
-
       {overlay.type === "shape" && (
         <ShapeControls overlay={overlay} onChange={onChange} />
       )}
 
       {overlay.type === "text" && (
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-neutral-400">Isi teks</span>
-          <textarea
-            value={overlay.text ?? ""}
-            onChange={(e) => onChange({ text: e.target.value })}
-            rows={3}
-            placeholder="Tulis teks, Enter untuk baris baru"
-            className={`${input} resize-none leading-relaxed`}
-          />
-        </label>
+        <>
+          <label className="flex flex-col gap-1.5">
+            <span className="flex items-center justify-between text-xs font-medium text-neutral-400">
+              <span>Isi teks</span>
+              {(overlay.textCase ?? "none") !== "none" && (
+                <span className="text-[11px] text-neutral-500">
+                  Tampil sesuai mode kapital di bawah
+                </span>
+              )}
+            </span>
+            <textarea
+              value={overlay.text ?? ""}
+              onChange={(e) => onChange({ text: e.target.value })}
+              rows={3}
+              placeholder="Tulis teks, Enter untuk baris baru"
+              style={{
+                textTransform:
+                  overlay.textCase === "upper"
+                    ? "uppercase"
+                    : overlay.textCase === "lower"
+                      ? "lowercase"
+                      : overlay.textCase === "capitalize"
+                        ? "capitalize"
+                        : "none",
+              }}
+              className={`${input} resize-none leading-relaxed`}
+            />
+          </label>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-neutral-400">
+              Gaya font
+            </span>
+            <div role="group" aria-label="Gaya font" className="grid grid-cols-3 gap-1.5">
+              {(
+                [
+                  { key: "bold", label: "Tebal", symbol: "B", active: overlay.bold ?? true, style: { fontWeight: 700 } },
+                  { key: "italic", label: "Miring", symbol: "I", active: !!overlay.italic, style: { fontStyle: "italic" } },
+                  { key: "strikethrough", label: "Coret", symbol: "S", active: !!overlay.strikethrough, style: { textDecoration: "line-through" } },
+                ] as const
+              ).map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  onClick={() =>
+                    onChange(
+                      s.key === "bold"
+                        ? { bold: !(overlay.bold ?? true) }
+                        : s.key === "italic"
+                          ? { italic: !overlay.italic }
+                          : { strikethrough: !overlay.strikethrough },
+                    )
+                  }
+                  aria-pressed={s.active}
+                  title={s.label}
+                  aria-label={`Font ${s.label.toLowerCase()}`}
+                  style={s.style}
+                  className={`rounded-lg border py-2 text-sm transition-colors ${
+                    s.active
+                      ? "border-white bg-white text-black"
+                      : "border-neutral-700 bg-black text-neutral-300 hover:bg-neutral-800"
+                  }`}
+                >
+                  {s.symbol}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-neutral-400">
+              Kapitalisasi tampilan
+            </span>
+            <div
+              role="group"
+              aria-label="Kapitalisasi tampilan teks"
+              className="grid grid-cols-4 gap-1.5"
+            >
+              {(
+                [
+                  { key: "none", label: "Seperti diketik", sample: "Abc" },
+                  { key: "upper", label: "Kapital semua", sample: "ABC" },
+                  { key: "lower", label: "Huruf kecil semua", sample: "abc" },
+                  { key: "capitalize", label: "Awal kata besar", sample: "Abc" },
+                ] as const
+              ).map((c) => {
+                const active = (overlay.textCase ?? "none") === c.key;
+                return (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() =>
+                      onChange({
+                        textCase: c.key === "none" ? undefined : c.key,
+                      })
+                    }
+                    aria-pressed={active}
+                    title={c.label}
+                    aria-label={`Kapitalisasi: ${c.label.toLowerCase()}`}
+                    className={`rounded-lg border py-2 text-sm transition-colors ${
+                      active
+                        ? "border-white bg-white text-black"
+                        : "border-neutral-700 bg-black text-neutral-300 hover:bg-neutral-800"
+                    }`}
+                  >
+                    {c.sample}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] leading-relaxed text-neutral-600">
+              Hanya mengubah tampilan — isi asli tetap tersimpan.
+            </p>
+          </div>
+        </>
       )}
 
       {overlay.type !== "text" && (

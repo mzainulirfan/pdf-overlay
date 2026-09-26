@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createShapeOverlay,
   createTextOverlay,
+  normalizeRotation,
   type Overlay,
   type ShapeKind,
 } from "@/types/overlay";
@@ -41,17 +42,53 @@ import PdfUploader from "@/components/pdf/PdfUploader";
 import PdfNavigation from "@/components/pdf/PdfNavigation";
 import PdfPagePreview from "@/components/pdf/PdfPagePreview";
 import OverlayList from "@/components/overlay/OverlayList";
-import OverlayProperties from "@/components/overlay/OverlayProperties";
+import OverlayProperties, {
+  BulkOverlayProperties,
+} from "@/components/overlay/OverlayProperties";
 import TemplateDialog from "@/components/template/TemplateDialog";
 import ShortcutHelp from "@/components/pdf/ShortcutHelp";
 
 type PdfjsDoc = PDFDocumentProxy;
 
-type DeletedOverlay = {
-  overlay: Overlay;
-  image: HTMLImageElement | null;
-  index: number;
+type HistoryEntry = {
+  label: string;
+  at: number;
+  overlays: Overlay[];
+  images: Record<string, HTMLImageElement | null>;
 };
+
+const HISTORY_CAP = 30;
+const HISTORY_COALESCE_MS = 1500;
+
+/** Label riwayat dari patch agar drag beruntun tergrup jadi satu langkah. */
+function historyLabelForPatch(patch: Partial<Overlay>): string {
+  const keys = Object.keys(patch);
+  if (keys.length > 2) return "Ubah overlay";
+  if (
+    patch.text !== undefined ||
+    patch.name !== undefined ||
+    patch.textCase !== undefined ||
+    patch.bold !== undefined ||
+    patch.italic !== undefined ||
+    patch.strikethrough !== undefined
+  )
+    return "Ubah teks";
+  if (patch.widthRatio !== undefined || patch.heightRatio !== undefined)
+    return "Ubah ukuran";
+  if (patch.xRatio !== undefined || patch.yRatio !== undefined)
+    return "Pindahkan overlay";
+  if (patch.rotation !== undefined) return "Putar overlay";
+  if (patch.opacity !== undefined) return "Ubah opasitas";
+  if (patch.visible !== undefined) return "Ubah visibilitas";
+  if (patch.locked !== undefined) return "Kunci overlay";
+  if (
+    patch.strokeRatio !== undefined ||
+    patch.fillMode !== undefined ||
+    patch.shape !== undefined
+  )
+    return "Ubah bentuk";
+  return "Ubah overlay";
+}
 
 export default function PdfEditor() {
   const [pdfInfo, setPdfInfo] = useState<PdfDocumentInfo | null>(null);
@@ -66,7 +103,66 @@ export default function PdfEditor() {
   const [overlayImages, setOverlayImages] = useState<
     Record<string, HTMLImageElement | null>
   >({});
-  const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
+  // Multi-seleksi: Set ID terurut sisipan (terakhir = primer untuk panel).
+  const [selectedOverlayIds, setSelectedOverlayIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const selectedIdsRef = useRef<Set<string>>(new Set());
+  // Jangkar awal untuk seleksi range (Shift+klik) di daftar.
+  const lastAnchorRef = useRef<string | null>(null);
+
+  // Satu-satunya penulis seleksi agar ref selalu sinkron untuk dibaca
+  // gesture drag (yang butuh himpunan saat pointerdown, sebelum render).
+  const setSelection = (next: Set<string>) => {
+    selectedIdsRef.current = next;
+    setSelectedOverlayIds(next);
+  };
+
+  const getSelection = useCallback((): Set<string> => {
+    return selectedIdsRef.current;
+  }, []);
+
+  // Seleksi dari daftar: klik = ganti, Ctrl/Cmd = toggle, Shift = range.
+  const selectInList = useCallback(
+    (id: string, mod: { additive: boolean; range: boolean }) => {
+      if (mod.range && lastAnchorRef.current) {
+        const ids = overlays.map((o) => o.id);
+        const a = ids.indexOf(lastAnchorRef.current);
+        const b = ids.indexOf(id);
+        if (a !== -1 && b !== -1) {
+          const [lo, hi] = [Math.min(a, b), Math.max(a, b)];
+          setSelection(new Set(ids.slice(lo, hi + 1)));
+          lastAnchorRef.current = id;
+          return;
+        }
+      }
+      if (mod.additive) {
+        const next = new Set(selectedIdsRef.current);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelection(next);
+      } else {
+        setSelection(new Set([id]));
+      }
+      lastAnchorRef.current = id;
+    },
+    [overlays],
+  );
+
+  const resolveSelection = useCallback((id: string, additive: boolean) => {
+    const prev = selectedIdsRef.current;
+    let next: Set<string>;
+    if (!additive) {
+      next = new Set([id]);
+    } else {
+      next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+    }
+    selectedIdsRef.current = next;
+    setSelectedOverlayIds(next);
+    lastAnchorRef.current = id;
+  }, []);
 
   const [templates, setTemplates] = useState<OverlayTemplate[]>([]);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
@@ -101,65 +197,151 @@ export default function PdfEditor() {
     [dismissToast],
   );
 
-  // Tumpukan hapus (maks 10) agar hapus beruntun tetap bisa diurungkan
-  // satu per satu, bukan hanya hapus terakhir.
-  const [deletedStack, setDeletedStack] = useState<DeletedOverlay[]>([]);
+  // Riwayat umum (undo/redo): snapshot SEBELUM mutasi, khusus ref agar
+  // stabil dipakai dari semua callback. Cap 30 langkah; aksi cepat
+  // berlabel sama digabung (coalesce 1,5 dtk) mis. drag & ketikan.
+  const pastRef = useRef<HistoryEntry[]>([]);
+  const futureRef = useRef<HistoryEntry[]>([]);
+  const lastPushRef = useRef<{ label: string; at: number } | null>(null);
+  const overlaysRef = useRef(overlays);
+  const imagesRef = useRef(overlayImages);
 
-  const restoreDeleted = useCallback((deleted: DeletedOverlay) => {
-    setOverlays((prev) => {
-      if (prev.some((o) => o.id === deleted.overlay.id)) return prev;
-      const next = [...prev];
-      next.splice(Math.min(deleted.index, next.length), 0, deleted.overlay);
-      return next;
-    });
-    if (deleted.image) {
-      setOverlayImages((prev) => ({
-        ...prev,
-        [deleted.overlay.id]: deleted.image,
-      }));
-    }
-    setSelectedOverlayId(deleted.overlay.id);
+  useEffect(() => {
+    overlaysRef.current = overlays;
+    imagesRef.current = overlayImages;
+  });
+
+  const takeSnapshot = (label: string): HistoryEntry => ({
+    label,
+    at: Date.now(),
+    overlays: structuredClone(
+      overlaysRef.current.map((o) =>
+        o.imageBytes ? { ...o, imageBytes: undefined } : o,
+      ),
+    ),
+    images: { ...imagesRef.current },
+  });
+
+  const pushHistory = useCallback((label: string) => {
+    const now = Date.now();
+    const last = lastPushRef.current;
+    if (last && last.label === label && now - last.at < HISTORY_COALESCE_MS)
+      return;
+    lastPushRef.current = { label, at: now };
+    pastRef.current = [
+      ...pastRef.current.slice(-(HISTORY_CAP - 1)),
+      takeSnapshot(label),
+    ];
+    futureRef.current = [];
   }, []);
 
-  const undoDelete = useCallback(() => {
-    const top = deletedStack[deletedStack.length - 1];
-    if (!top) return;
-    setDeletedStack((prev) => prev.slice(0, -1));
-    restoreDeleted(top);
-  }, [deletedStack, restoreDeleted]);
+  const applyHistoryEntry = useCallback((entry: HistoryEntry) => {
+    const restored = structuredClone(entry.overlays);
+    setOverlays(restored);
+    setOverlayImages({ ...entry.images });
+    setSelection(
+      new Set(
+        [...selectedIdsRef.current].filter((id) =>
+          restored.some((o) => o.id === id),
+        ),
+      ),
+    );
+  }, []);
 
-  const undoDeleteById = useCallback(
-    (id: string) => {
-      const found = deletedStack.find((d) => d.overlay.id === id);
-      if (!found) return;
-      setDeletedStack((prev) => prev.filter((d) => d.overlay.id !== id));
-      restoreDeleted(found);
-    },
-    [deletedStack, restoreDeleted],
-  );
+  const undo = useCallback(() => {
+    const entry = pastRef.current[pastRef.current.length - 1];
+    if (!entry) return;
+    pastRef.current = pastRef.current.slice(0, -1);
+    futureRef.current = [
+      ...futureRef.current.slice(-(HISTORY_CAP - 1)),
+      takeSnapshot(entry.label),
+    ];
+    applyHistoryEntry(entry);
+  }, [applyHistoryEntry]);
+
+  const redo = useCallback(() => {
+    const entry = futureRef.current[futureRef.current.length - 1];
+    if (!entry) return;
+    futureRef.current = futureRef.current.slice(0, -1);
+    pastRef.current = [
+      ...pastRef.current.slice(-(HISTORY_CAP - 1)),
+      takeSnapshot(entry.label),
+    ];
+    applyHistoryEntry(entry);
+  }, [applyHistoryEntry]);
+
+  const clearHistory = useCallback(() => {
+    pastRef.current = [];
+    futureRef.current = [];
+    lastPushRef.current = null;
+  }, []);
 
   const deleteOverlay = useCallback(
     (id: string) => {
-      const index = overlays.findIndex((o) => o.id === id);
-      if (index === -1) return;
-      const target = overlays[index];
-      const image = overlayImages[id] ?? null;
+      if (!overlays.some((o) => o.id === id)) return;
+      pushHistory("Hapus overlay");
       setOverlays((prev) => prev.filter((o) => o.id !== id));
       setOverlayImages((prev) => {
         const next = { ...prev };
         delete next[id];
         return next;
       });
-      setSelectedOverlayId((prev) => (prev === id ? null : prev));
-      setDeletedStack((prev) =>
-        [...prev, { overlay: target, image, index }].slice(-10),
-      );
+      const nextSelection = new Set(selectedIdsRef.current);
+      nextSelection.delete(id);
+      setSelection(nextSelection);
       pushToast("info", "Overlay dihapus.", {
-        action: { label: "Urungkan", onClick: () => undoDeleteById(id) },
+        action: { label: "Urungkan", onClick: () => undo() },
         durationMs: 5000,
       });
     },
-    [overlays, overlayImages, pushToast, undoDeleteById],
+    [overlays, pushToast, undo, pushHistory],
+  );
+
+  // Aksi massal untuk seleksi jamak (dipakai panel bulk).
+  const bulkPatchSelected = useCallback(
+    (label: string, patch: (o: Overlay) => Partial<Overlay>) => {
+      const ids = [...selectedIdsRef.current];
+      if (ids.length === 0) return;
+      pushHistory(label);
+      const idSet = new Set(ids);
+      setOverlays((prev) =>
+        prev.map((o) => (idSet.has(o.id) ? { ...o, ...patch(o) } : o)),
+      );
+    },
+    [pushHistory],
+  );
+
+  const bulkDelete = useCallback(
+    (ids: string[]) => {
+      const targets = overlays.filter((o) => ids.includes(o.id));
+      if (targets.length === 0) return;
+      pushHistory(
+        targets.length === 1
+          ? "Hapus overlay"
+          : `Hapus ${targets.length} overlay`,
+      );
+      const idSet = new Set(ids);
+      setOverlays((prev) => prev.filter((o) => !idSet.has(o.id)));
+      setOverlayImages((prev) => {
+        const next = { ...prev };
+        for (const id of ids) delete next[id];
+        return next;
+      });
+      setSelection(
+        new Set([...selectedIdsRef.current].filter((id) => !idSet.has(id))),
+      );
+      pushToast(
+        "info",
+        targets.length === 1
+          ? "Overlay dihapus."
+          : `${targets.length} overlay dihapus.`,
+        {
+          action: { label: "Urungkan", onClick: () => undo() },
+          durationMs: 5000,
+        },
+      );
+    },
+    [overlays, pushToast, undo, pushHistory],
   );
 
   const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -226,13 +408,13 @@ export default function PdfEditor() {
   const applyTemplate = useCallback(async (template: OverlayTemplate) => {
     const nextOverlays: Overlay[] = [];
     const nextImages: Record<string, HTMLImageElement | null> = {};
-    let firstId: string | null = null;
+    const nextIds: string[] = [];
 
     const storedOverlays = Array.isArray(template.overlays) ? template.overlays : [];
 
     for (const stored of storedOverlays) {
       const id = `overlay-${crypto.randomUUID()}`;
-      if (!firstId) firstId = id;
+      nextIds.push(id);
       const overlay = overlayFromStored(stored, id);
       nextOverlays.push(overlay);
       if (stored.type === "image" && stored.imageDataUrl) {
@@ -252,7 +434,7 @@ export default function PdfEditor() {
 
     setOverlays((prev) => [...prev, ...nextOverlays]);
     setOverlayImages((prev) => ({ ...prev, ...nextImages }));
-    setSelectedOverlayId(firstId);
+    setSelection(new Set(nextIds));
     setError(null);
   }, []);
 
@@ -263,15 +445,15 @@ export default function PdfEditor() {
       if (!id) return;
       const template = templates.find((t) => t.id === id);
       if (!template) return;
+      pushHistory(mode === "replace" ? "Ganti template" : "Terapkan template");
       if (mode === "replace") {
         setOverlays([]);
         setOverlayImages({});
-        setSelectedOverlayId(null);
-        setDeletedStack([]);
+        setSelection(new Set());
       }
       void applyTemplate(template);
     },
-    [templates, applyTemplate],
+    [templates, applyTemplate, pushHistory],
   );
 
   const handleSaveTemplate = useCallback(
@@ -358,8 +540,8 @@ export default function PdfEditor() {
         setCurrentPage(1);
         setOverlays([]);
         setOverlayImages({});
-        setSelectedOverlayId(null);
-        setDeletedStack([]);
+        setSelection(new Set());
+        clearHistory();
         setPdfInfo({
           file,
           fileName: file.name,
@@ -376,7 +558,7 @@ export default function PdfEditor() {
         setError((err as Error)?.message ?? "File tidak dapat diproses.");
       }
     },
-    [templates, activeTemplateId, applyTemplate],
+    [templates, activeTemplateId, applyTemplate, clearHistory],
   );
 
   const handleSelectFile = useCallback(
@@ -528,19 +710,37 @@ export default function PdfEditor() {
     );
   }, []);
 
-  const addTextOverlay = useCallback((text?: string) => {
-    const overlay = createTextOverlay(text);
-    setOverlays((prev) => [...prev, overlay]);
-    setSelectedOverlayId(overlay.id);
-    setError(null);
-  }, []);
+  // Semua perubahan properti lewat sini agar masuk riwayat undo
+  // (drag beruntun tergrup otomatis via coalesce).
+  const updateOverlayWithHistory = useCallback(
+    (id: string, patch: Partial<Overlay>) => {
+      pushHistory(historyLabelForPatch(patch));
+      updateOverlay(id, patch);
+    },
+    [pushHistory, updateOverlay],
+  );
 
-  const addShapeOverlay = useCallback((kind: ShapeKind = "rect") => {
-    const overlay = createShapeOverlay(kind);
-    setOverlays((prev) => [...prev, overlay]);
-    setSelectedOverlayId(overlay.id);
-    setError(null);
-  }, []);
+  const addTextOverlay = useCallback(
+    (text?: string) => {
+      pushHistory("Tambah teks");
+      const overlay = createTextOverlay(text);
+      setOverlays((prev) => [...prev, overlay]);
+      setSelection(new Set([overlay.id]));
+      setError(null);
+    },
+    [pushHistory],
+  );
+
+  const addShapeOverlay = useCallback(
+    (kind: ShapeKind = "rect") => {
+      pushHistory("Tambah bentuk");
+      const overlay = createShapeOverlay(kind);
+      setOverlays((prev) => [...prev, overlay]);
+      setSelection(new Set([overlay.id]));
+      setError(null);
+    },
+    [pushHistory],
+  );
 
   const handleImageChosen = useCallback(async (file: File | undefined) => {
     if (!file) return;
@@ -561,6 +761,7 @@ export default function PdfEditor() {
         type: "image",
         imageUrl: dataUrl,
       } as Overlay);
+      pushHistory("Tambah gambar");
       const overlay: Overlay = {
         id: `overlay-${crypto.randomUUID()}`,
         type: "image",
@@ -577,29 +778,32 @@ export default function PdfEditor() {
       };
       setOverlays((prev) => [...prev, overlay]);
       setOverlayImages((prev) => ({ ...prev, [overlay.id]: image }));
-      setSelectedOverlayId(overlay.id);
+      setSelection(new Set([overlay.id]));
     } catch {
       setError("Gambar tidak dapat digunakan. Pilih file PNG atau JPG.");
     }
-  }, []);
+  }, [pushHistory]);
 
 
   const toggleOverlayVisibility = useCallback((id: string) => {
+    pushHistory("Ubah visibilitas");
     setOverlays((prev) =>
       prev.map((o) =>
         o.id === id ? { ...o, visible: !(o.visible !== false) } : o,
       ),
     );
-  }, []);
+  }, [pushHistory]);
 
   const toggleOverlayLock = useCallback((id: string) => {
+    pushHistory("Kunci overlay");
     setOverlays((prev) =>
       prev.map((o) => (o.id === id ? { ...o, locked: !o.locked } : o)),
     );
-  }, []);
+  }, [pushHistory]);
 
   /** Geser urutan overlay (z-order): -1 ke bawah, +1 ke atas. */
   const moveOverlay = useCallback((id: string, dir: -1 | 1) => {
+    pushHistory("Urutkan overlay");
     setOverlays((prev) => {
       const index = prev.findIndex((o) => o.id === id);
       const target = index + dir;
@@ -608,10 +812,11 @@ export default function PdfEditor() {
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
-  }, []);
+  }, [pushHistory]);
 
   /** Pindahkan overlay ke indeks array tujuan (untuk drag-and-drop). */
   const moveOverlayTo = useCallback((id: string, toArrayIndex: number) => {
+    pushHistory("Urutkan overlay");
     setOverlays((prev) => {
       const from = prev.findIndex((o) => o.id === id);
       if (from === -1) return prev;
@@ -620,12 +825,13 @@ export default function PdfEditor() {
       next.splice(Math.min(Math.max(0, toArrayIndex), next.length), 0, moved);
       return next;
     });
-  }, []);
+  }, [pushHistory]);
 
   const duplicateOverlay = useCallback(
     (id: string) => {
       const source = overlays.find((o) => o.id === id);
       if (!source) return;
+      pushHistory("Duplikat overlay");
       const baseName = source.name?.trim();
       const copy: Overlay = {
         ...source,
@@ -645,12 +851,13 @@ export default function PdfEditor() {
       if (image) {
         setOverlayImages((prev) => ({ ...prev, [copy.id]: image }));
       }
-      setSelectedOverlayId(copy.id);
+      setSelection(new Set([copy.id]));
     },
-    [overlays, overlayImages],
+    [overlays, overlayImages, pushHistory],
   );
 
   const resetOverlay = useCallback((id: string) => {
+    pushHistory("Reset tampilan");
     setOverlays((prev) =>
       prev.map((o) =>
         o.id === id
@@ -666,7 +873,7 @@ export default function PdfEditor() {
           : o,
       ),
     );
-  }, []);
+  }, [pushHistory]);
 
   const buildExportBytes = useCallback(async () => {
     const visible = overlays.filter((o) => o.visible !== false);
@@ -817,10 +1024,10 @@ export default function PdfEditor() {
     setCurrentPage(1);
     setOverlays([]);
     setOverlayImages({});
-    setSelectedOverlayId(null);
+    setSelection(new Set());
     setError(null);
-    setDeletedStack([]);
-  }, []);
+    clearHistory();
+  }, [clearHistory]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -841,7 +1048,12 @@ export default function PdfEditor() {
           if (editorActiveRef.current) void handlePrint();
         } else if (key === "z" && !isTyping) {
           e.preventDefault();
-          if (editorActiveRef.current) undoDelete();
+          if (!editorActiveRef.current) return;
+          if (e.shiftKey) redo();
+          else undo();
+        } else if (key === "y" && !isTyping) {
+          e.preventDefault();
+          if (editorActiveRef.current) redo();
         }
         return;
       }
@@ -851,14 +1063,49 @@ export default function PdfEditor() {
         setShapePresetOpen(false);
         setPendingFile(null);
         setShortcutOpen(false);
-        if (!isTyping) setSelectedOverlayId(null);
+        if (!isTyping) setSelection(new Set());
+        return;
+      }
+
+      // Geser presisi seluruh seleksi: 1% per tekan, 10% bila tahan Shift.
+      if (e.key.startsWith("Arrow") && !isTyping) {
+        const dir =
+          e.key === "ArrowLeft"
+            ? [-1, 0]
+            : e.key === "ArrowRight"
+              ? [1, 0]
+              : e.key === "ArrowUp"
+                ? [0, -1]
+                : e.key === "ArrowDown"
+                  ? [0, 1]
+                  : null;
+        const targets = overlays.filter((o) =>
+          selectedIdsRef.current.has(o.id),
+        );
+        if (dir && targets.length > 0) {
+          e.preventDefault();
+          const step = e.shiftKey ? 0.1 : 0.01;
+          for (const target of targets) {
+            updateOverlayWithHistory(target.id, {
+              xRatio: Math.min(
+                Math.max(0, target.xRatio + dir[0] * step),
+                Math.max(0, 1 - target.widthRatio),
+              ),
+              yRatio: Math.min(
+                Math.max(0, target.yRatio + dir[1] * step),
+                Math.max(0, 1 - target.heightRatio),
+              ),
+            });
+          }
+        }
         return;
       }
 
       if ((e.key === "Delete" || e.key === "Backspace") && !isTyping) {
-        if (selectedOverlayId) {
+        const ids = [...selectedIdsRef.current];
+        if (ids.length > 0) {
           e.preventDefault();
-          deleteOverlay(selectedOverlayId);
+          bulkDelete(ids);
         }
       }
     };
@@ -867,9 +1114,11 @@ export default function PdfEditor() {
   }, [
     handleExport,
     handlePrint,
-    deleteOverlay,
-    selectedOverlayId,
-    undoDelete,
+    bulkDelete,
+    undo,
+    redo,
+    overlays,
+    updateOverlayWithHistory,
   ]);
 
   if (!pdfInfo || !pdfDoc) {
@@ -889,8 +1138,15 @@ export default function PdfEditor() {
     : overlays.length === 0
       ? "Tambahkan overlay terlebih dahulu (Teks / Gambar / Bentuk)."
       : "Semua overlay disembunyikan — tampilkan minimal satu untuk mengekspor.";
-  const selectedOverlay =
-    overlays.find((o) => o.id === selectedOverlayId) ?? null;
+  const selectedOverlays = overlays.filter((o) =>
+    selectedOverlayIds.has(o.id),
+  );
+  // Primer = terakhir dipilih (urutan sisipan Set) untuk panel properti.
+  const primaryOverlay =
+    [...selectedOverlayIds]
+      .reverse()
+      .map((id) => overlays.find((o) => o.id === id))
+      .find((o): o is Overlay => !!o) ?? null;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pb-12">
@@ -1284,9 +1540,18 @@ export default function PdfEditor() {
                   canvas={pageCanvas}
                   overlays={overlays}
                   images={overlayImages}
-                  selectedId={selectedOverlayId}
-                  onSelect={setSelectedOverlayId}
-                  onChange={updateOverlay}
+                  selectedIds={selectedOverlayIds}
+                  primaryId={primaryOverlay?.id ?? null}
+                  onSelectOverlay={(id, additive) =>
+                    resolveSelection(id, additive)
+                  }
+                  onNarrowSelection={(id) => setSelection(new Set([id]))}
+                  onEmptyClick={() => {
+                    setSelection(new Set());
+                    lastAnchorRef.current = null;
+                  }}
+                  getSelection={getSelection}
+                  onChange={updateOverlayWithHistory}
                   onDelete={deleteOverlay}
                   onReset={resetOverlay}
                   onDuplicate={duplicateOverlay}
@@ -1307,34 +1572,80 @@ export default function PdfEditor() {
           </div>
         </div>
 
-        <aside className="flex w-full flex-col gap-4 lg:w-72 lg:shrink-0">
+        <aside className="flex w-full flex-col gap-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-80 lg:shrink-0 lg:overflow-y-auto">
           <section
             aria-labelledby="overlay-panel-title"
             className="flex flex-col gap-4 rounded-2xl border border-neutral-800 bg-neutral-900 p-5"
           >
-            <h2
-              id="overlay-panel-title"
-              className="text-sm font-semibold text-neutral-100"
-            >
-              Overlay
-            </h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2
+                id="overlay-panel-title"
+                className="text-sm font-semibold text-neutral-100"
+              >
+                Overlay
+              </h2>
+              <span
+                aria-label={`${overlays.length} overlay`}
+                className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-white"
+              >
+                {overlays.length}
+              </span>
+            </div>
             <OverlayList
               overlays={overlays}
-              selectedId={selectedOverlayId}
-              onSelect={setSelectedOverlayId}
+              selectedIds={selectedOverlayIds}
+              onSelect={(id, mod) => selectInList(id, mod)}
               onDelete={deleteOverlay}
               onToggleVisibility={toggleOverlayVisibility}
               onToggleLock={toggleOverlayLock}
               onMove={moveOverlay}
               onMoveTo={moveOverlayTo}
               onDuplicate={duplicateOverlay}
+              onRename={(id, name) =>
+                updateOverlayWithHistory(id, { name })
+              }
             />
             <div>
-              {selectedOverlay ? (
+              {selectedOverlays.length > 1 ? (
+                <BulkOverlayProperties
+                  selected={selectedOverlays}
+                  onBulkOpacity={(value) =>
+                    bulkPatchSelected("Ubah opasitas", () => ({
+                      opacity: value,
+                    }))
+                  }
+                  onBulkRotateBy={(delta) =>
+                    bulkPatchSelected("Putar overlay", (o) => ({
+                      rotation: normalizeRotation(o.rotation + delta),
+                    }))
+                  }
+                  onBulkVisibility={() => {
+                    const allVisible = selectedOverlays.every(
+                      (o) => o.visible !== false,
+                    );
+                    bulkPatchSelected("Ubah visibilitas", () => ({
+                      visible: !allVisible,
+                    }));
+                  }}
+                  onBulkLock={() => {
+                    const allLocked = selectedOverlays.every(
+                      (o) => !!o.locked,
+                    );
+                    bulkPatchSelected("Kunci overlay", () => ({
+                      locked: !allLocked,
+                    }));
+                  }}
+                  onBulkDelete={() =>
+                    bulkDelete(
+                      selectedOverlays.map((o) => o.id),
+                    )
+                  }
+                />
+              ) : primaryOverlay ? (
                 <OverlayProperties
-                  overlay={selectedOverlay}
+                  overlay={primaryOverlay}
                   onChange={(patch) =>
-                    updateOverlay(selectedOverlay.id, patch)
+                    updateOverlayWithHistory(primaryOverlay.id, patch)
                   }
                 />
               ) : overlays.length === 0 ? (
@@ -1347,7 +1658,7 @@ export default function PdfEditor() {
                     Belum ada overlay.
                   </span>
                   <span className="text-sm font-medium text-neutral-300">
-                    Tambahkan teks atau gambar untuk memulai.
+                    Tambahkan teks, gambar, atau bentuk untuk memulai.
                   </span>
                 </button>
               ) : (
@@ -1363,7 +1674,7 @@ export default function PdfEditor() {
 
       {/* Drop overlay saat mengganti file */}
       {dropActive && (
-        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/50 px-4 backdrop-blur-sm">
+        <div className="animate-fade-in pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/50 px-4 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-white bg-neutral-900/40 px-10 py-8 text-center">
             <svg
               className="h-8 w-8 text-white"
@@ -1394,9 +1705,9 @@ export default function PdfEditor() {
           aria-modal="true"
           aria-busy="true"
           aria-labelledby="export-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 px-4 backdrop-blur-sm"
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 px-4 backdrop-blur-sm"
         >
-          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl bg-neutral-900 p-8 text-center shadow-xl">
+          <div className="animate-pop-in flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl bg-neutral-900 p-8 text-center shadow-xl">
             <div
               className="h-10 w-10 animate-spin rounded-full border-[3px] border-neutral-700 border-t-white"
               aria-hidden
@@ -1418,9 +1729,9 @@ export default function PdfEditor() {
           aria-modal="true"
           aria-labelledby="replace-pdf-title"
           aria-describedby="replace-pdf-desc"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
         >
-          <div className="w-full max-w-sm rounded-2xl border border-neutral-800 bg-neutral-900 p-5 shadow-xl">
+          <div className="animate-pop-in w-full max-w-sm rounded-2xl border border-neutral-800 bg-neutral-900 p-5 shadow-xl">
             <h2
               id="replace-pdf-title"
               className="text-sm font-semibold text-neutral-100"

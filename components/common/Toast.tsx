@@ -64,7 +64,7 @@ export default function Toast({
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${STYLES[t.type]}`}
+          className={`animate-toast-in flex items-center gap-3 rounded-xl border px-4 py-3 ${STYLES[t.type]}`}
         >
           <span
             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${ICON_COLORS[t.type]}`}

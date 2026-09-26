@@ -5,12 +5,17 @@ import {
   type Rotation,
   type ShapeFillMode,
   type ShapeKind,
+  type TextCase,
 } from "@/types/overlay";
 
 /** Bagian overlay yang bisa diserialisasi ke localStorage. */
 export type StoredOverlay = {
   type: "text" | "image" | "shape";
   name?: string;
+  bold?: boolean;
+  italic?: boolean;
+  strikethrough?: boolean;
+  textCase?: TextCase;
   shape?: ShapeKind;
   fillMode?: ShapeFillMode;
   strokeRatio?: number;
@@ -42,6 +47,10 @@ export function templateFromOverlays(
     overlays: overlays.map((o) => ({
       type: o.type,
       name: o.name,
+      bold: o.bold,
+      italic: o.italic,
+      strikethrough: o.strikethrough,
+      textCase: o.textCase,
       shape: o.shape,
       fillMode: o.fillMode,
       strokeRatio: o.strokeRatio,
@@ -71,10 +80,20 @@ export function overlayFromStored(
       : "rect";
   const fillMode: ShapeFillMode =
     stored.fillMode === "outline" ? "outline" : "solid";
+  const textCase: TextCase | undefined =
+    stored.textCase === "upper" ||
+    stored.textCase === "lower" ||
+    stored.textCase === "capitalize"
+      ? stored.textCase
+      : undefined;
   return {
     id,
     type: stored.type,
     name: stored.name,
+    bold: stored.bold,
+    italic: stored.italic,
+    strikethrough: stored.strikethrough,
+    textCase,
     shape,
     fillMode,
     strokeRatio:

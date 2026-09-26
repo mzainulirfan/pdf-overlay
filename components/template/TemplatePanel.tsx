@@ -252,7 +252,7 @@ export default function TemplatePanel({
             <legend className="px-1 text-[11px] font-medium text-neutral-500">
               Overlay yang ikut tersimpan
             </legend>
-            {overlays.map((o, index) => {
+            {overlays.map((o) => {
               const checked = includedIds ? includedIds.has(o.id) : true;
               const hidden = o.visible === false;
               return (
@@ -279,7 +279,7 @@ export default function TemplatePanel({
                         : "G"}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-neutral-200">
-                    {overlayLabel(o, index)}
+                    {overlayLabel(o, overlays)}
                   </span>
                   {hidden && (
                     <span className="shrink-0 text-[10px] text-neutral-500">

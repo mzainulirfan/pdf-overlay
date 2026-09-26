@@ -150,7 +150,7 @@ function OverlayContextBar({
       aria-label={
         armed ? "Konfirmasi hapus overlay" : "Aksi cepat overlay terpilih"
       }
-      className={`flex items-center gap-0.5 overflow-hidden rounded-full border bg-black/85 p-0.5 shadow-lg backdrop-blur ${
+      className={`animate-fade-in flex items-center gap-0.5 overflow-hidden rounded-full border bg-black/85 p-0.5 shadow-lg backdrop-blur ${
         armed ? "border-red-500/60" : "border-neutral-700"
       }`}
     >
@@ -280,9 +280,12 @@ export type TransformBoxProps = {
   pageHeight: number;
   containerRef: React.RefObject<HTMLDivElement | null>;
   selected: boolean;
+  /** Hanya primer (terakhir dipilih) yang menampilkan gagang + bar. */
+  showBar: boolean;
   /** Rasio alami gambar (kunci aspek) atau null untuk bebas. */
   aspectLock: number | null;
-  onSelect: () => void;
+  onSelect: (additive: boolean) => void;
+  onNarrow: () => void;
   onLiveFrame: (frame: PixelFrame) => void;
   onCommitFrame: (frame: PixelFrame) => void;
   onRotateLive: (rotation: number) => void;
@@ -311,8 +314,10 @@ export default function TransformBox({
   pageHeight,
   containerRef,
   selected,
+  showBar,
   aspectLock,
   onSelect,
+  onNarrow,
   onLiveFrame,
   onCommitFrame,
   onRotateLive,
@@ -325,6 +330,12 @@ export default function TransformBox({
   const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 3) : 1;
   const gestureRef = useRef<Gesture | null>(null);
   const lastFrameRef = useRef<PixelFrame | null>(null);
+  const downInfoRef = useRef<{
+    x: number;
+    y: number;
+    wasSelected: boolean;
+    shift: boolean;
+  } | null>(null);
 
   const rotation = normalizeRotation(overlay.rotation);
   const { x, y, width, height } = frame;
@@ -438,20 +449,44 @@ export default function TransformBox({
   const beginGesture = (
     e: React.PointerEvent,
     gesture: Gesture,
+    additive: boolean,
   ) => {
     e.stopPropagation();
     e.preventDefault();
-    onSelect();
+    // CATATAN: jangan panggil onSelect di sini bila pemanggil sudah
+    // melakukannya — resolveSelection toggle berbasis ref sinkron,
+    // dua panggilan dalam satu tick saling membatalkan (bug multi-select).
+    // Setiap starter (drag/resize/rotate) memanggil onSelect sendiri.
+    downInfoRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      wasSelected: selected,
+      shift: additive,
+    };
     gestureRef.current = gesture;
     lastFrameRef.current = null;
     activePointerRef.current = e.pointerId;
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
+  const handlePointerUp = (e: React.PointerEvent) => {
+    const info = downInfoRef.current;
+    downInfoRef.current = null;
+    const moved = info
+      ? Math.hypot(e.clientX - info.x, e.clientY - info.y) >= 4
+      : true;
+    // Klik tanpa geser pada anggota set: sempitkan seleksi ke overlay ini.
+    if (info && info.wasSelected && !info.shift && !moved) onNarrow();
+    finishGesture(moved);
+  };
+
   const finishGesture = (commit: boolean) => {
     activePointerRef.current = null;
     endGesture(commit);
   };
+
+  const modifierDown = (e: React.PointerEvent) =>
+    e.shiftKey || e.ctrlKey || e.metaKey;
 
   const startDrag = (e: React.PointerEvent) => {
     if (e.button !== 0 || overlay.locked) return;
@@ -462,11 +497,12 @@ export default function TransformBox({
       startPX: p.x,
       startPY: p.y,
       orig: { x, y, width, height },
-    });
+    }, modifierDown(e));
   };
 
   const startResize = (e: React.PointerEvent, handle: ResizeHandleDef) => {
     if (e.button !== 0 || overlay.locked) return;
+    if (!selected) onSelect(modifierDown(e));
     const rad = degToRad(rotation);
     const ux = Math.cos(rad);
     const uy = Math.sin(rad);
@@ -474,6 +510,7 @@ export default function TransformBox({
     const vy = Math.cos(rad);
     const ax = 1 - handle.fx;
     const ay = 1 - handle.fy;
+    const additive = modifierDown(e);
     beginGesture(e, {
       mode: "resize",
       anchorX: x + ux * ax * width + vx * ay * height,
@@ -489,11 +526,12 @@ export default function TransformBox({
       freeU: handle.freeU,
       freeV: handle.freeV,
       lock: aspectLock,
-    });
+    }, additive);
   };
 
   const startRotate = (e: React.PointerEvent) => {
     if (e.button !== 0 || overlay.locked) return;
+    if (!selected) onSelect(modifierDown(e));
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     const cx = x + width / 2;
@@ -506,7 +544,7 @@ export default function TransformBox({
       centerY: cy,
       startAngle,
       startRotation: rotation,
-    });
+    }, modifierDown(e));
   };
 
   // Geometri seleksi dalam koordinat halaman. lx,ly relatif ke
@@ -555,7 +593,7 @@ export default function TransformBox({
           onPointerDown={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            onSelect();
+            onSelect(e.shiftKey || e.ctrlKey || e.metaKey);
           }}
           role="button"
           aria-label={`Overlay ${overlayTypeName} disembunyikan, klik untuk memilih`}
@@ -606,12 +644,19 @@ export default function TransformBox({
           // membatalkan seleksi (terlihat pada overlay terkunci).
           e.stopPropagation();
           e.preventDefault();
-          onSelect();
+          // Sudah anggota set: biarkan utuh agar drag memindahkan semuanya.
+          // Penyempitan ke satu terjadi di pointerup bila tanpa geser.
+          if (!selected) {
+            onSelect(e.shiftKey || e.ctrlKey || e.metaKey);
+          }
           startDrag(e);
         }}
         onPointerMove={onPointerMove}
-        onPointerUp={() => finishGesture(true)}
-        onPointerCancel={() => finishGesture(false)}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => {
+          downInfoRef.current = null;
+          finishGesture(false);
+        }}
         role="button"
         aria-label={
           overlay.locked
@@ -651,7 +696,7 @@ export default function TransformBox({
             }}
           />
           )}
-          {!overlay.locked && overlay.visible !== false && (
+          {showBar && !overlay.locked && overlay.visible !== false && (
             <>
               {/* Gagang resize di 8 titik sudut/sisi terotasi */}
               <div aria-hidden className="pointer-events-none absolute inset-0">
@@ -662,7 +707,7 @@ export default function TransformBox({
                       key={h.id}
                       onPointerDown={(e) => startResize(e, h)}
                       onPointerMove={onPointerMove}
-                      onPointerUp={() => finishGesture(true)}
+                      onPointerUp={handlePointerUp}
                       onPointerCancel={() => finishGesture(false)}
                       title="Seret untuk mengubah ukuran"
                       className={`pointer-events-auto absolute h-3.5 w-3.5 touch-none rounded-full border-2 border-neutral-900 bg-white shadow ${h.cursor}`}
@@ -702,7 +747,7 @@ export default function TransformBox({
                         onMouseDown={(e) => e.stopPropagation()}
                         onPointerDown={startRotate}
                         onPointerMove={onPointerMove}
-                        onPointerUp={() => finishGesture(false)}
+                        onPointerUp={handlePointerUp}
                         onPointerCancel={() => finishGesture(false)}
                         className="pointer-events-auto flex h-5 w-5 touch-none cursor-grab items-center justify-center rounded-full border border-neutral-400 bg-black shadow-lg transition-colors hover:border-white active:cursor-grabbing"
                       >
@@ -718,10 +763,11 @@ export default function TransformBox({
               </div>
             </>
           )}
-          {/* Context bar melayang di atas/bawah bbox.
+          {/* Context bar melayang di atas/bawah bbox — hanya primer.
               pointer-events-auto wajib: induk overlay memakai
               pointer-events-none (diwariskan), tanpanya seluruh tombol
               tak pernah menerima event dan klik tembus ke lapisan konten. */}
+          {showBar && (
           <div
             className="absolute z-20 pointer-events-auto"
             style={barStyle}
@@ -736,6 +782,7 @@ export default function TransformBox({
               onDelete={onDelete}
             />
           </div>
+          )}
         </>
       )}
     </div>

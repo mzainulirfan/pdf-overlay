@@ -5,8 +5,12 @@ import { useEffect } from "react";
 const SHORTCUTS: { keys: string; desc: string }[] = [
   { keys: "Ctrl + S", desc: "Simpan PDF" },
   { keys: "Ctrl + P", desc: "Cetak PDF" },
-  { keys: "Ctrl + Z", desc: "Urungkan hapus terakhir" },
+  { keys: "Ctrl + Z", desc: "Urungkan perubahan terakhir" },
+  { keys: "Ctrl + Shift + Z / Ctrl + Y", desc: "Ulangi (redo)" },
   { keys: "Delete / Backspace", desc: "Hapus overlay terpilih" },
+  { keys: "Panah", desc: "Geser 1% (Shift = 10%)" },
+  { keys: "Shift + klik", desc: "Tambah ke seleksi / range di daftar" },
+  { keys: "Ctrl + klik", desc: "Toggle seleksi" },
   { keys: "Esc", desc: "Tutup menu / batalkan pilihan" },
   { keys: "Shift (tahan)", desc: "Snap putar tiap 15°" },
   { keys: "Enter", desc: "Konfirmasi isian angka / nama" },
@@ -35,7 +39,7 @@ export default function ShortcutHelp({
       role="dialog"
       aria-modal="true"
       aria-labelledby="shortcut-dialog-title"
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center px-4"
     >
       <button
         type="button"
@@ -44,7 +48,7 @@ export default function ShortcutHelp({
         onClick={onClose}
         className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm"
       />
-      <div className="relative w-full max-w-sm rounded-2xl border border-neutral-800 bg-neutral-900 p-5 shadow-xl">
+      <div className="animate-pop-in relative w-full max-w-sm rounded-2xl border border-neutral-800 bg-neutral-900 p-5 shadow-xl">
         <div className="flex items-start justify-between gap-3">
           <h2
             id="shortcut-dialog-title"
@@ -88,8 +92,8 @@ export default function ShortcutHelp({
           ))}
         </ul>
         <p className="mt-4 text-xs leading-relaxed text-neutral-500">
-          Ctrl+Z hanya mengurungkan hapus — geser, putar, dan ubahan lain
-          tidak masuk riwayat undo.
+          Riwayat 30 langkah; aksi cepat beruntun (mis. drag) digabung jadi
+          satu langkah undo.
         </p>
       </div>
     </div>

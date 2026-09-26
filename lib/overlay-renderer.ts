@@ -1,4 +1,4 @@
-import type { Overlay } from "@/types/overlay";
+import type { Overlay, TextCase } from "@/types/overlay";
 import { DEFAULT_STROKE_RATIO, normalizeRotation } from "@/types/overlay";
 import { rotatedBBox } from "@/lib/coordinate-converter";
 
@@ -55,7 +55,7 @@ export function renderOverlayToCanvas(
   ctx.translate(-width / 2, -height / 2);
 
   if (overlay.type === "text") {
-    drawText(ctx, overlay.text || "", width, height);
+    drawText(ctx, overlay, width, height);
   } else if (overlay.type === "image") {
     drawImage(ctx, image, width, height);
   } else if (overlay.type === "shape") {
@@ -71,22 +71,29 @@ export function renderOverlayToCanvas(
  * Kata yang sendirian melebihi lebar box dipecah per karakter agar
  * teks tanpa spasi (mis. "HANDLEWITHCARE") tetap terbungkus.
  */
+/** Susun string font canvas dari gaya overlay + ukuran. */
+function buildFont(overlay: Overlay, fontSize: number): string {
+  const weight = (overlay.bold ?? true) ? 700 : 400;
+  const style = overlay.italic ? "italic " : "";
+  return `${style}${weight} ${fontSize}px ${FONT_FAMILY}`;
+}
+
 function wrapParagraph(
   ctx: CanvasRenderingContext2D,
   paragraph: string,
   maxWidth: number,
-  fontSize: number,
+  font: string,
 ): string[] {
   const words: string[] = [];
   for (const word of paragraph.split(/\s+/)) {
     if (!word) continue;
-    if (measureTextWidth(ctx, word, fontSize) <= maxWidth) {
+    if (measureTextWidth(ctx, word, font) <= maxWidth) {
       words.push(word);
       continue;
     }
     let chunk = "";
     for (const ch of word) {
-      if (chunk === "" || measureTextWidth(ctx, chunk + ch, fontSize) <= maxWidth) {
+      if (chunk === "" || measureTextWidth(ctx, chunk + ch, font) <= maxWidth) {
         chunk += ch;
       } else {
         words.push(chunk);
@@ -100,7 +107,7 @@ function wrapParagraph(
   let current = "";
   for (const word of words) {
     const trial = current ? `${current} ${word}` : word;
-    if (!current || measureTextWidth(ctx, trial, fontSize) <= maxWidth) {
+    if (!current || measureTextWidth(ctx, trial, font) <= maxWidth) {
       current = trial;
     } else {
       lines.push(current);
@@ -111,30 +118,49 @@ function wrapParagraph(
   return lines;
 }
 
+/** Terapkan kapitalisasi tampilan (isi asli tidak diubah). */
+export function applyTextCase(text: string, mode?: TextCase): string {
+  switch (mode) {
+    case "upper":
+      return text.toUpperCase();
+    case "lower":
+      return text.toLowerCase();
+    case "capitalize":
+      return text.replace(/(^|\s)(\p{L})/gmu, (_, pre: string, ch: string) =>
+        pre + ch.toUpperCase(),
+      );
+    default:
+      return text;
+  }
+}
+
 function drawText(
   ctx: CanvasRenderingContext2D,
-  text: string,
+  overlay: Overlay,
   width: number,
   height: number,
 ) {
+  // Case diterapkan SEBELUM wrap/ukur agar lebar baris tepat.
+  const text = applyTextCase(overlay.text || "", overlay.textCase);
   const targetWidth = width * 0.94;
   const targetHeight = height * 0.94;
   const rawLineHeight = 1.2;
   const MIN_FONT = 8;
 
   // "\n" manual tetap jadi jeda keras; paragraf kosong jadi baris spasi.
-  const wrapAll = (fontSize: number): string[] =>
+  const wrapAll = (font: string): string[] =>
     text
       .split("\n")
-      .flatMap((p) => (p.trim() === "" ? [""] : wrapParagraph(ctx, p, targetWidth, fontSize)));
+      .flatMap((p) => (p.trim() === "" ? [""] : wrapParagraph(ctx, p, targetWidth, font)));
 
   // Cari font terbesar yang muat: bungkus lalu kecilkan hingga pas.
   let fontSize = Math.max(MIN_FONT, targetHeight);
-  let lines = wrapAll(fontSize);
+  let font = buildFont(overlay, fontSize);
+  let lines = wrapAll(font);
   for (let i = 0; i < 60; i++) {
     let widest = 0;
     for (const line of lines) {
-      widest = Math.max(widest, measureTextWidth(ctx, line, fontSize));
+      widest = Math.max(widest, measureTextWidth(ctx, line, font));
     }
     const fits =
       widest <= targetWidth &&
@@ -143,20 +169,29 @@ function drawText(
     const next = fontSize * 0.94;
     if (next < MIN_FONT) break;
     fontSize = next;
-    lines = wrapAll(fontSize);
+    font = buildFont(overlay, fontSize);
+    lines = wrapAll(font);
   }
   fontSize = Math.max(MIN_FONT, fontSize);
-  lines = wrapAll(fontSize);
+  font = buildFont(overlay, fontSize);
+  lines = wrapAll(font);
 
-  ctx.font = `700 ${fontSize}px ${FONT_FAMILY}`;
+  ctx.font = font;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#000000";
 
   const lineHeight = fontSize * rawLineHeight;
   const startY = height / 2 - ((lines.length - 1) * lineHeight) / 2;
+  const strike = !!overlay.strikethrough;
+  const strikeThick = Math.max(1, fontSize / 12);
   lines.forEach((line, index) => {
-    ctx.fillText(line, width / 2, startY + index * lineHeight);
+    const y = startY + index * lineHeight;
+    ctx.fillText(line, width / 2, y);
+    if (strike && line !== "") {
+      const w = ctx.measureText(line).width;
+      ctx.fillRect(width / 2 - w / 2, y - strikeThick / 2, w, strikeThick);
+    }
   });
 }
 
@@ -238,9 +273,9 @@ function drawShape(
 function measureTextWidth(
   ctx: CanvasRenderingContext2D,
   text: string,
-  fontSize: number,
+  font: string,
 ): number {
-  ctx.font = `700 ${fontSize}px ${FONT_FAMILY}`;
+  ctx.font = font;
   return ctx.measureText(text).width;
 }
 

@@ -2,17 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Overlay, ShapeKind } from "@/types/overlay";
+import { applyTextCase } from "@/lib/overlay-renderer";
 
 type OverlayListProps = {
   overlays: Overlay[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  selectedIds: Set<string>;
+  onSelect: (id: string, mod: { additive: boolean; range: boolean }) => void;
   onDelete: (id: string) => void;
   onToggleVisibility: (id: string) => void;
   onToggleLock: (id: string) => void;
   onMove: (id: string, dir: -1 | 1) => void;
   onMoveTo: (id: string, toArrayIndex: number) => void;
   onDuplicate: (id: string) => void;
+  onRename: (id: string, name: string | undefined) => void;
 };
 
 const SHAPE_NAMES: Record<ShapeKind, string> = {
@@ -22,15 +24,31 @@ const SHAPE_NAMES: Record<ShapeKind, string> = {
   arrow: "Panah",
 };
 
-export function overlayLabel(overlay: Overlay, index: number): string {
+function baseLabel(overlay: Overlay): string {
   if (overlay.name?.trim()) return overlay.name.trim();
   if (overlay.type === "text") {
-    const firstLine = (overlay.text ?? "").split("\n")[0].trim();
-    return firstLine || `Teks ${index + 1}`;
+    // Samakan dengan kanvas: tampilkan hasil kapitalisasi, bukan isi mentah.
+    const firstLine = applyTextCase(overlay.text ?? "", overlay.textCase)
+      .split("\n")[0]
+      .trim();
+    return firstLine || "Teks";
   }
-  if (overlay.type === "shape")
-    return `${SHAPE_NAMES[overlay.shape ?? "rect"]} ${index + 1}`;
-  return `Gambar ${index + 1}`;
+  if (overlay.type === "shape") return SHAPE_NAMES[overlay.shape ?? "rect"];
+  return "Gambar";
+}
+
+/**
+ * Label layer: nomor hanya ditambahkan bila ada ≥2 overlay berlabel dasar
+ * sama (perbandingan tak sensitif huruf besar-kecil). Tunggal = polos.
+ */
+export function overlayLabel(overlay: Overlay, overlays: Overlay[]): string {
+  const base = baseLabel(overlay);
+  const group = overlays.filter(
+    (o) => baseLabel(o).toLowerCase() === base.toLowerCase(),
+  );
+  if (group.length <= 1) return base;
+  const pos = group.findIndex((o) => o.id === overlay.id) + 1;
+  return `${base} ${pos}`;
 }
 
 /** Path Heroicons (outline) — jangan diubah sembarang, bentuknya presisi. */
@@ -106,7 +124,7 @@ function MiniIcon({ d, solid }: { d: string; solid?: boolean }) {
 
 export default function OverlayList({
   overlays,
-  selectedId,
+  selectedIds,
   onSelect,
   onDelete,
   onToggleVisibility,
@@ -114,6 +132,7 @@ export default function OverlayList({
   onMove,
   onMoveTo,
   onDuplicate,
+  onRename,
 }: OverlayListProps) {
   // ID overlay yang sedang diseret + posisi drop dalam urutan tampil (0..n).
   const [dragId, setDragId] = useState<string | null>(null);
@@ -121,6 +140,23 @@ export default function OverlayList({
   // Konfirmasi hapus 2-klik: klik pertama arm (memerah), klik kedua eksekusi.
   const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
   const armTimerRef = useRef<number | null>(null);
+  // Rename inline: id baris yang sedang diedit + draf teksnya.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [listOpen, setListOpen] = useState(true);
+
+  const startRename = (overlay: Overlay) => {
+    setEditingId(overlay.id);
+    setDraft(overlay.name ?? "");
+  };
+
+  const commitRename = (overlay: Overlay) => {
+    const next = draft.trim();
+    if ((next || undefined) !== (overlay.name ?? undefined)) {
+      onRename(overlay.id, next || undefined);
+    }
+    setEditingId(null);
+  };
 
   useEffect(
     () => () => {
@@ -168,17 +204,47 @@ export default function OverlayList({
 
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-xs font-medium text-neutral-400">
-        Daftar overlay ({overlays.length})
-      </h3>
-      <ul className="flex flex-col gap-1.5" aria-label="Daftar overlay">
+      <button
+        type="button"
+        onDoubleClick={() => setListOpen((v) => !v)}
+        aria-expanded={listOpen}
+        aria-controls="overlay-layer-list"
+        title="Klik 2x untuk buka/tutup daftar"
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="text-xs font-medium text-neutral-400">
+          Daftar layer{" "}
+          {selectedIds.size > 0 && (
+            <span className="text-neutral-200">
+              · {selectedIds.size} dipilih
+            </span>
+          )}
+          <span className="text-neutral-600"> · klik 2x</span>
+        </span>
+        <svg
+          className={`h-3.5 w-3.5 shrink-0 text-neutral-400 transition-transform ${listOpen ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+          aria-hidden
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      <div
+        className={`collapse-anim ${listOpen ? "open" : "closed"}`}
+        inert={!listOpen}
+      >
+      <div className="collapse-inner">
+      <ul id="overlay-layer-list" className="flex flex-col gap-1.5" aria-label="Daftar overlay">
         {ordered.map(({ overlay, arrayIndex }, displayIndex) => {
-          const isSelected = overlay.id === selectedId;
+          const isSelected = selectedIds.has(overlay.id);
           const isVisible = overlay.visible !== false;
           const isLocked = !!overlay.locked;
           const isFront = arrayIndex === overlays.length - 1;
           const isBack = arrayIndex === 0;
-          const label = overlayLabel(overlay, displayIndex);
+          const label = overlayLabel(overlay, overlays);
           const isDragging = dragId === overlay.id;
           const showDropAbove = dropDisplayPos === displayIndex;
           const showDropBelow =
@@ -225,7 +291,7 @@ export default function OverlayList({
                   commitDrop(before ? displayIndex : displayIndex + 1);
                 }}
                 title={`Seret untuk mengurutkan ${label}`}
-                className={`flex cursor-grab select-none flex-col gap-1 rounded-lg border p-1.5 transition-colors active:cursor-grabbing ${
+                className={`group flex cursor-grab select-none flex-col gap-1 rounded-lg border p-1.5 transition-colors active:cursor-grabbing ${
                   isSelected
                     ? "border-white bg-white/5"
                     : "border-neutral-800 bg-black/40"
@@ -233,12 +299,46 @@ export default function OverlayList({
                   isDragging ? "opacity-40" : ""
                 }`}
               >
+              {editingId === overlay.id ? (
+                <div className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1">
+                  <span
+                    aria-hidden
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-white/20 text-[10px] font-bold text-white"
+                  >
+                    ✎
+                  </span>
+                  <input
+                    type="text"
+                    value={draft}
+                    autoFocus
+                    maxLength={40}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onBlur={() => commitRename(overlay)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter")
+                        (e.target as HTMLInputElement).blur();
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Nama baru untuk ${label}`}
+                    placeholder="Nama layer (kosongkan = otomatis)"
+                    className="min-w-0 flex-1 rounded-md border border-white/40 bg-black px-2 py-0.5 text-sm text-white outline-none placeholder:text-neutral-600"
+                  />
+                </div>
+              ) : (
+              <div className="flex min-w-0 items-center gap-1">
               <button
                 type="button"
-                onClick={() => onSelect(overlay.id)}
+                onClick={(e) => {
+                  const additive =
+                    e.shiftKey || e.ctrlKey || e.metaKey;
+                  onSelect(overlay.id, { additive, range: e.shiftKey });
+                }}
+                onDoubleClick={() => startRename(overlay)}
                 aria-pressed={isSelected}
-                title={`Pilih overlay ${label}`}
-                className={`flex min-w-0 items-center gap-2 truncate rounded-md px-1.5 py-1 text-left text-sm transition-colors ${
+                title={`Pilih overlay ${label} (Shift = range, Ctrl = tambah, klik 2x = ubah nama)`}
+                className={`flex min-w-0 flex-1 items-center gap-2 truncate rounded-md px-1.5 py-1 text-left text-sm transition-colors ${
                   isSelected
                     ? "font-medium text-white"
                     : "text-neutral-300 hover:bg-neutral-800/60"
@@ -261,7 +361,7 @@ export default function OverlayList({
                   )}
                 </span>
                 <span className="truncate">
-                  {displayIndex + 1}. {label}
+                  {label}
                 </span>
                 {isLocked && (
                   <span aria-hidden className="shrink-0 text-neutral-300">
@@ -269,10 +369,36 @@ export default function OverlayList({
                   </span>
                 )}
               </button>
+              <button
+                type="button"
+                onClick={() => startRename(overlay)}
+                aria-label={`Ubah nama overlay ${label}`}
+                title="Ubah nama"
+                className="shrink-0 rounded-md p-1 text-neutral-500 transition-colors hover:bg-neutral-800/60 hover:text-neutral-200"
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.75 2.75 0 0 1 15.25 21H5.25A2.75 2.75 0 0 1 2.5 18.25v-9.5A2.75 2.75 0 0 1 5.25 6H10"
+                  />
+                </svg>
+              </button>
+              </div>
+              )}
               <div
                 role="group"
                 aria-label={`Aksi untuk overlay ${label}`}
-                className="flex items-center gap-1 pl-8"
+                className={`items-center gap-1 pl-8 ${
+                  isSelected ? "flex" : "hidden group-focus-within:flex"
+                }`}
               >
                 <button
                   type="button"
@@ -367,6 +493,8 @@ export default function OverlayList({
           );
         })}
       </ul>
+      </div>
+      </div>
       <p className="text-[11px] leading-relaxed text-neutral-600">
         Seret baris untuk mengurutkan (atas = depan). Tombol ↑/↓ tetap bisa
         dipakai via keyboard & layar sentuh.
