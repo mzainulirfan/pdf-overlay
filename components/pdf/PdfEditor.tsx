@@ -5,6 +5,7 @@ import {
   createShapeOverlay,
   createTextOverlay,
   type Overlay,
+  type ShapeKind,
 } from "@/types/overlay";
 import type { PdfDocumentInfo } from "@/types/pdf";
 import {
@@ -167,6 +168,7 @@ export default function PdfEditor() {
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [shortcutOpen, setShortcutOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState(false);
+  const [shapePresetOpen, setShapePresetOpen] = useState(false);
   const exportTitleRef = useRef<HTMLParagraphElement>(null);
 
   const TEXT_PRESETS = [
@@ -175,6 +177,13 @@ export default function PdfEditor() {
     "JANGAN DIBANTING",
     "BARANG MUDAH PECAH",
     "THIS SIDE UP",
+  ];
+
+  const SHAPE_PRESETS: { kind: ShapeKind; label: string }[] = [
+    { kind: "rect", label: "Persegi" },
+    { kind: "ellipse", label: "Elips" },
+    { kind: "line", label: "Garis" },
+    { kind: "arrow", label: "Panah" },
   ];
 
   const MIN_ZOOM = 0.5;
@@ -526,8 +535,8 @@ export default function PdfEditor() {
     setError(null);
   }, []);
 
-  const addShapeOverlay = useCallback(() => {
-    const overlay = createShapeOverlay();
+  const addShapeOverlay = useCallback((kind: ShapeKind = "rect") => {
+    const overlay = createShapeOverlay(kind);
     setOverlays((prev) => [...prev, overlay]);
     setSelectedOverlayId(overlay.id);
     setError(null);
@@ -839,6 +848,7 @@ export default function PdfEditor() {
 
       if (e.key === "Escape") {
         setPresetOpen(false);
+        setShapePresetOpen(false);
         setPendingFile(null);
         setShortcutOpen(false);
         if (!isTyping) setSelectedOverlayId(null);
@@ -1065,22 +1075,78 @@ export default function PdfEditor() {
                 </svg>
                 Gambar
               </button>
-              <button
-                type="button"
-                onClick={addShapeOverlay}
-                title="Tambah persegi hitam (atur transparansi di panel)"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-[13px] font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden
-                >
-                  <rect x="4" y="7" width="16" height="10" rx="1" />
-                </svg>
-                Bentuk
-              </button>
+              <div className="relative">
+                <div className="flex">
+                  <button
+                    type="button"
+                    onClick={() => addShapeOverlay("rect")}
+                    title="Tambah persegi hitam"
+                    className="inline-flex items-center gap-1.5 rounded-l-xl border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-[13px] font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                      aria-hidden
+                    >
+                      <rect x="4" y="7" width="16" height="10" rx="1" />
+                    </svg>
+                    Bentuk
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShapePresetOpen((v) => !v)}
+                    aria-haspopup="menu"
+                    aria-expanded={shapePresetOpen}
+                    aria-label="Pilih jenis bentuk"
+                    title="Pilih jenis bentuk"
+                    className="rounded-r-xl border border-l-0 border-neutral-700 bg-neutral-900 px-1.5 text-neutral-200 transition-colors hover:bg-neutral-800"
+                  >
+                    <svg
+                      className={`h-4 w-4 transition-transform ${shapePresetOpen ? "rotate-180" : ""}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                </div>
+                {shapePresetOpen && (
+                  <>
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      aria-hidden
+                      onClick={() => setShapePresetOpen(false)}
+                      className="fixed inset-0 z-20 cursor-default"
+                    />
+                    <ul
+                      role="menu"
+                      aria-label="Jenis bentuk overlay"
+                      className="absolute left-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900 py-1 shadow-xl shadow-black/40"
+                    >
+                      {SHAPE_PRESETS.map((preset) => (
+                        <li key={preset.kind} role="none">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              addShapeOverlay(preset.kind);
+                              setShapePresetOpen(false);
+                            }}
+                            className="block w-full truncate px-4 py-2 text-left text-sm text-neutral-200 transition-colors hover:bg-neutral-800"
+                          >
+                            {preset.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
               <label htmlFor="overlay-image-input" className="sr-only">
                 Pilih gambar overlay PNG atau JPG
               </label>

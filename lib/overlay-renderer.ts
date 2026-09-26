@@ -1,5 +1,5 @@
 import type { Overlay } from "@/types/overlay";
-import { normalizeRotation } from "@/types/overlay";
+import { DEFAULT_STROKE_RATIO, normalizeRotation } from "@/types/overlay";
 import { rotatedBBox } from "@/lib/coordinate-converter";
 
 const FONT_FAMILY = '"Arial", "Helvetica Neue", Helvetica, system-ui, sans-serif';
@@ -59,7 +59,7 @@ export function renderOverlayToCanvas(
   } else if (overlay.type === "image") {
     drawImage(ctx, image, width, height);
   } else if (overlay.type === "shape") {
-    drawShape(ctx, width, height);
+    drawShape(ctx, overlay, width, height);
   }
 
   ctx.restore();
@@ -161,16 +161,78 @@ function drawText(
 }
 
 /**
- * Persegi hitam penuh seukuran box. Transparansi diatur lewat
- * globalAlpha (slider opacity overlay) sehingga bisa tembus pandang.
+ * Bentuk hitam seukuran box: persegi, elips, garis, atau panah.
+ * Transparansi diatur lewat globalAlpha (slider opacity overlay).
+ * Tebal garis = fraksi sisi terkecil box agar konsisten di semua skala.
  */
 function drawShape(
   ctx: CanvasRenderingContext2D,
+  overlay: Overlay,
   width: number,
   height: number,
 ) {
+  const kind = overlay.shape ?? "rect";
+  const outline = (overlay.fillMode ?? "solid") === "outline";
+  const ratio =
+    typeof overlay.strokeRatio === "number" &&
+    Number.isFinite(overlay.strokeRatio) &&
+    overlay.strokeRatio > 0
+      ? overlay.strokeRatio
+      : DEFAULT_STROKE_RATIO;
+  const sw = Math.max(1, ratio * Math.min(width, height));
+
   ctx.fillStyle = "#000000";
-  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = sw;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  if (kind === "line" || kind === "arrow") {
+    const pad = width * 0.04;
+    const y = height / 2;
+    const x1 = pad;
+    const x2 = width - pad;
+    ctx.beginPath();
+    ctx.moveTo(x1, y);
+    ctx.lineTo(x2, y);
+    ctx.stroke();
+    if (kind === "arrow") {
+      const headLen = Math.max(4 * sw, 8);
+      const headAngle = Math.PI / 7;
+      const baseAngle = 0;
+      ctx.beginPath();
+      ctx.moveTo(x2, y);
+      ctx.lineTo(
+        x2 - headLen * Math.cos(headAngle - baseAngle),
+        y - headLen * Math.sin(headAngle - baseAngle),
+      );
+      ctx.moveTo(x2, y);
+      ctx.lineTo(
+        x2 - headLen * Math.cos(headAngle + baseAngle),
+        y + headLen * Math.sin(headAngle + baseAngle),
+      );
+      ctx.stroke();
+    }
+    return;
+  }
+
+  if (kind === "ellipse") {
+    ctx.beginPath();
+    if (outline) {
+      ctx.ellipse(width / 2, height / 2, (width - sw) / 2, (height - sw) / 2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.ellipse(width / 2, height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
+
+  if (outline) {
+    ctx.strokeRect(sw / 2, sw / 2, width - sw, height - sw);
+  } else {
+    ctx.fillRect(0, 0, width, height);
+  }
 }
 
 function measureTextWidth(

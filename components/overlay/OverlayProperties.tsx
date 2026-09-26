@@ -1,6 +1,153 @@
 "use client";
 
-import { normalizeRotation, type Overlay } from "@/types/overlay";
+import type { ReactNode } from "react";
+import {
+  DEFAULT_STROKE_RATIO,
+  normalizeRotation,
+  type Overlay,
+  type ShapeFillMode,
+  type ShapeKind,
+} from "@/types/overlay";
+
+const SHAPE_KINDS: { kind: ShapeKind; label: string; icon: ReactNode }[] = [
+  {
+    kind: "rect",
+    label: "Persegi",
+    icon: (
+      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+        <rect x="5" y="7" width="14" height="10" rx="1" />
+      </svg>
+    ),
+  },
+  {
+    kind: "ellipse",
+    label: "Elips",
+    icon: (
+      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+        <ellipse cx="12" cy="12" rx="8" ry="5.5" />
+      </svg>
+    ),
+  },
+  {
+    kind: "line",
+    label: "Garis",
+    icon: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden>
+        <path strokeLinecap="round" d="M4 12h16" />
+      </svg>
+    ),
+  },
+  {
+    kind: "arrow",
+    label: "Panah",
+    icon: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 12h13m-4-4 4 4-4 4" />
+      </svg>
+    ),
+  },
+];
+
+function ShapeControls({
+  overlay,
+  onChange,
+}: {
+  overlay: Overlay;
+  onChange: (patch: Partial<Overlay>) => void;
+}) {
+  const kind = overlay.shape ?? "rect";
+  const fillMode: ShapeFillMode =
+    overlay.fillMode === "outline" ? "outline" : "solid";
+  const strokePct = Math.round(
+    (overlay.strokeRatio ?? DEFAULT_STROKE_RATIO) * 100,
+  );
+  const needsStroke = fillMode === "outline" || kind === "line" || kind === "arrow";
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-neutral-400">
+          Jenis bentuk
+        </span>
+        <div
+          role="group"
+          aria-label="Jenis bentuk"
+          className="grid grid-cols-4 gap-1.5"
+        >
+          {SHAPE_KINDS.map((s) => (
+            <button
+              key={s.kind}
+              type="button"
+              onClick={() => onChange({ shape: s.kind })}
+              aria-pressed={kind === s.kind}
+              title={s.label}
+              aria-label={`Bentuk ${s.label.toLowerCase()}`}
+              className={`flex flex-col items-center gap-1 rounded-lg border py-2 text-neutral-300 transition-colors hover:bg-neutral-800 ${
+                kind === s.kind
+                  ? "border-white bg-white/10 text-white"
+                  : "border-neutral-700"
+              }`}
+            >
+              {s.icon}
+              <span className="text-[10px] leading-none">{s.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {(kind === "rect" || kind === "ellipse") && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-neutral-400">Isian</span>
+          <div role="group" aria-label="Mode isian bentuk" className="grid grid-cols-2 gap-1.5">
+            {(
+              [
+                { mode: "solid", label: "Penuh" },
+                { mode: "outline", label: "Garis tepi" },
+              ] as const
+            ).map((m) => (
+              <button
+                key={m.mode}
+                type="button"
+                onClick={() => onChange({ fillMode: m.mode })}
+                aria-pressed={fillMode === m.mode}
+                className={`rounded-lg border py-2 text-sm font-medium transition-colors ${
+                  fillMode === m.mode
+                    ? "border-white bg-white text-black"
+                    : "border-neutral-700 bg-black text-neutral-300 hover:bg-neutral-800"
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {needsStroke && (
+        <label className="flex flex-col gap-1.5">
+          <span className="flex items-center justify-between text-xs font-medium text-neutral-400">
+            <span>Tebal garis</span>
+            <span className="font-semibold tabular-nums text-white">
+              {strokePct}%
+            </span>
+          </span>
+          <input
+            type="range"
+            min={0.5}
+            max={15}
+            step={0.5}
+            value={Math.min(15, Math.max(0.5, strokePct))}
+            aria-label="Tebal garis dalam persen sisi terkecil"
+            onChange={(e) =>
+              onChange({ strokeRatio: Number(e.target.value) / 100 })
+            }
+            className="w-full accent-white"
+          />
+        </label>
+      )}
+    </div>
+  );
+}
 
 type OverlayPropertiesProps = {
   overlay: Overlay;
@@ -86,6 +233,10 @@ export default function OverlayProperties({
           className={input}
         />
       </label>
+
+      {overlay.type === "shape" && (
+        <ShapeControls overlay={overlay} onChange={onChange} />
+      )}
 
       {overlay.type === "text" && (
         <label className="flex flex-col gap-1.5">

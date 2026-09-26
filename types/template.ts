@@ -1,9 +1,19 @@
-import { normalizeRotation, type Overlay, type Rotation } from "@/types/overlay";
+import {
+  DEFAULT_STROKE_RATIO,
+  normalizeRotation,
+  type Overlay,
+  type Rotation,
+  type ShapeFillMode,
+  type ShapeKind,
+} from "@/types/overlay";
 
 /** Bagian overlay yang bisa diserialisasi ke localStorage. */
 export type StoredOverlay = {
   type: "text" | "image" | "shape";
   name?: string;
+  shape?: ShapeKind;
+  fillMode?: ShapeFillMode;
+  strokeRatio?: number;
   text?: string;
   imageDataUrl?: string;
   xRatio: number;
@@ -32,6 +42,9 @@ export function templateFromOverlays(
     overlays: overlays.map((o) => ({
       type: o.type,
       name: o.name,
+      shape: o.shape,
+      fillMode: o.fillMode,
+      strokeRatio: o.strokeRatio,
       text: o.text,
       imageDataUrl: o.type === "image" ? o.imageUrl : undefined,
       xRatio: o.xRatio,
@@ -50,10 +63,26 @@ export function overlayFromStored(
   stored: StoredOverlay,
   id: string,
 ): Overlay {
+  const shape: ShapeKind =
+    stored.shape === "ellipse" ||
+    stored.shape === "line" ||
+    stored.shape === "arrow"
+      ? stored.shape
+      : "rect";
+  const fillMode: ShapeFillMode =
+    stored.fillMode === "outline" ? "outline" : "solid";
   return {
     id,
     type: stored.type,
     name: stored.name,
+    shape,
+    fillMode,
+    strokeRatio:
+      typeof stored.strokeRatio === "number" &&
+      Number.isFinite(stored.strokeRatio) &&
+      stored.strokeRatio > 0
+        ? stored.strokeRatio
+        : DEFAULT_STROKE_RATIO,
     text: stored.text,
     imageUrl: stored.imageDataUrl,
     xRatio: stored.xRatio,

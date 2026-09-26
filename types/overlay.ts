@@ -1,5 +1,11 @@
 export type OverlayType = "text" | "image" | "shape";
 
+export type ShapeKind = "rect" | "ellipse" | "line" | "arrow";
+
+export type ShapeFillMode = "solid" | "outline";
+
+export const DEFAULT_STROKE_RATIO = 0.04;
+
 /** Derajat rotasi bebas, dinormalisasi ke 0–359 via normalizeRotation. */
 export type Rotation = number;
 
@@ -18,6 +24,13 @@ export type Overlay = {
   text?: string;
   imageUrl?: string;
   imageBytes?: ArrayBuffer;
+
+  /** Jenis bentuk (hanya untuk type "shape"). */
+  shape?: ShapeKind;
+  /** Penuh atau garis tepi saja (rect/ellipse). */
+  fillMode?: ShapeFillMode;
+  /** Tebal garis sebagai fraksi sisi terkecil box. */
+  strokeRatio?: number;
 
   /** Posisi kiri-atas dalam koordinat preview, dinormalisasi 0–1. */
   xRatio: number;
@@ -39,10 +52,11 @@ export type Overlay = {
 
 export const DEFAULT_OVERLAY_TEXT = "FRAGILE";
 
-export function createShapeOverlay(): Overlay {
+export function createShapeOverlay(kind: ShapeKind = "rect"): Overlay {
   return {
     id: `overlay-${crypto.randomUUID()}`,
     type: "shape",
+    shape: kind,
     xRatio: 0.35,
     yRatio: 0.45,
     widthRatio: 0.3,

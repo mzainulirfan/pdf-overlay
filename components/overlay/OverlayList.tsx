@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Overlay } from "@/types/overlay";
+import type { Overlay, ShapeKind } from "@/types/overlay";
 
 type OverlayListProps = {
   overlays: Overlay[];
@@ -15,13 +15,21 @@ type OverlayListProps = {
   onDuplicate: (id: string) => void;
 };
 
+const SHAPE_NAMES: Record<ShapeKind, string> = {
+  rect: "Persegi",
+  ellipse: "Elips",
+  line: "Garis",
+  arrow: "Panah",
+};
+
 export function overlayLabel(overlay: Overlay, index: number): string {
   if (overlay.name?.trim()) return overlay.name.trim();
   if (overlay.type === "text") {
     const firstLine = (overlay.text ?? "").split("\n")[0].trim();
     return firstLine || `Teks ${index + 1}`;
   }
-  if (overlay.type === "shape") return `Bentuk ${index + 1}`;
+  if (overlay.type === "shape")
+    return `${SHAPE_NAMES[overlay.shape ?? "rect"]} ${index + 1}`;
   return `Gambar ${index + 1}`;
 }
 
@@ -49,6 +57,30 @@ const miniDanger =
 
 const miniActive =
   "flex h-7 w-7 items-center justify-center rounded-md border border-white/40 bg-white/10 text-white transition-colors hover:bg-white/20";
+
+function ShapeBadge({ kind }: { kind: ShapeKind }) {
+  return (
+    <svg
+      className="h-3 w-3"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={3}
+      aria-hidden
+    >
+      {kind === "rect" && <rect x="5" y="8" width="14" height="8" />}
+      {kind === "ellipse" && <ellipse cx="12" cy="12" rx="8" ry="5" />}
+      {kind === "line" && <path strokeLinecap="round" d="M4 12h16" />}
+      {kind === "arrow" && (
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 12h13m-4-4 4 4-4 4"
+        />
+      )}
+    </svg>
+  );
+}
 
 function MiniIcon({ d, solid }: { d: string; solid?: boolean }) {
   if (solid) {
@@ -220,11 +252,13 @@ export default function OverlayList({
                       : "bg-neutral-700/60 text-neutral-300"
                   }`}
                 >
-                  {overlay.type === "text"
-                    ? "T"
-                    : overlay.type === "shape"
-                      ? "B"
-                      : "G"}
+                  {overlay.type === "text" ? (
+                    "T"
+                  ) : overlay.type === "shape" ? (
+                    <ShapeBadge kind={overlay.shape ?? "rect"} />
+                  ) : (
+                    "G"
+                  )}
                 </span>
                 <span className="truncate">
                   {displayIndex + 1}. {label}
