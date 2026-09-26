@@ -1,6 +1,8 @@
 import {
   DEFAULT_STROKE_RATIO,
+  normalizeCropRect,
   normalizeRotation,
+  type CropRect,
   type Overlay,
   type Rotation,
   type ShapeFillMode,
@@ -16,6 +18,7 @@ export type StoredOverlay = {
   italic?: boolean;
   strikethrough?: boolean;
   textCase?: TextCase;
+  crop?: CropRect;
   shape?: ShapeKind;
   fillMode?: ShapeFillMode;
   strokeRatio?: number;
@@ -51,6 +54,7 @@ export function templateFromOverlays(
       italic: o.italic,
       strikethrough: o.strikethrough,
       textCase: o.textCase,
+      crop: o.crop,
       shape: o.shape,
       fillMode: o.fillMode,
       strokeRatio: o.strokeRatio,
@@ -94,6 +98,7 @@ export function overlayFromStored(
     italic: stored.italic,
     strikethrough: stored.strikethrough,
     textCase,
+    crop: normalizeCropRect(stored.crop),
     shape,
     fillMode,
     strokeRatio:

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Overlay } from "@/types/overlay";
+import type { CropRect, Overlay } from "@/types/overlay";
 import { normalizeRotation } from "@/types/overlay";
 import { renderOverlayToCanvas } from "@/lib/overlay-renderer";
 import { degToRad, rotatedBBox } from "@/lib/coordinate-converter";
@@ -14,6 +14,14 @@ export type PixelFrame = {
 };
 
 const MIN_SIZE = 12;
+const MIN_CROP = 0.05;
+
+/** Crop penuh (cover) yang memenuhi aspek box, terpusat. */
+function defaultFullCrop(boxAspect: number, aspectImg: number): CropRect {
+  const r = boxAspect * Math.max(0.01, aspectImg);
+  if (r >= 1) return { x: 0, y: (1 - 1 / r) / 2, w: 1, h: 1 / r };
+  return { x: (1 - r) / 2, y: 0, w: r, h: 1 };
+}
 
 /** Path Heroicons (outline) — solid hanya untuk gembok. */
 const BAR_PATHS = {
@@ -39,6 +47,7 @@ function BarButton({
   solid,
   onPress,
   path,
+  icon,
 }: {
   label: string;
   title: string;
@@ -46,7 +55,8 @@ function BarButton({
   disabled?: boolean;
   solid?: boolean;
   onPress: () => void;
-  path: string;
+  path?: string;
+  icon?: React.ReactNode;
 }) {
   return (
     <button
@@ -63,27 +73,29 @@ function BarButton({
           : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
       }`}
     >
-      {solid ? (
-        <svg
-          className="h-4 w-4"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden
-        >
-          <path fillRule="evenodd" d={path} clipRule="evenodd" />
-        </svg>
-      ) : (
-        <svg
-          className="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d={path} />
-        </svg>
-      )}
+      {icon ??
+        (path &&
+          (solid ? (
+            <svg
+              className="h-4 w-4"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden
+            >
+              <path fillRule="evenodd" d={path} clipRule="evenodd" />
+            </svg>
+          ) : (
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+            </svg>
+          )))}
     </button>
   );
 }
@@ -95,7 +107,27 @@ type OverlayContextBarProps = {
   onToggleLock: () => void;
   onToggleVisibility: () => void;
   onDelete: () => void;
+  onCrop: (() => void) | null;
 };
+
+function CropMarkIcon() {
+  return (
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7 3v4H3M17 3v4h4M7 21v-4H3M17 21v-4h4"
+      />
+    </svg>
+  );
+}
 
 /**
  * Bar aksi melayang. State konfirmasi hapus disimpan di sini sehingga
@@ -108,6 +140,7 @@ function OverlayContextBar({
   onToggleLock,
   onToggleVisibility,
   onDelete,
+  onCrop,
 }: OverlayContextBarProps) {
   const [armed, setArmed] = useState(false);
   const armTimerRef = useRef<number | null>(null);
@@ -196,6 +229,14 @@ function OverlayContextBar({
             onPress={onDuplicate}
             path={BAR_PATHS.duplicate}
           />
+          {overlay.type === "image" && onCrop && !isLocked && (
+            <BarButton
+              label="Potong gambar"
+              title="Potong gambar (crop)"
+              onPress={onCrop}
+              icon={<CropMarkIcon />}
+            />
+          )}
           <span className="h-4 w-px shrink-0 bg-neutral-700" aria-hidden />
           <BarButton
             label={isLocked ? "Buka kunci overlay" : "Kunci overlay"}
@@ -221,6 +262,237 @@ function OverlayContextBar({
           />
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Editor crop inline: gambar penuh diredupkan, kotak crop (terkunci ke
+ * aspek box) bisa digeser + di-resize dari 4 sudutnya. Setiap perubahan
+ * langsung ditulis ke overlay.crop sehingga hasilnya realtime.
+ */
+function CropEditor({
+  image,
+  width,
+  height,
+  crop,
+  onCropLive,
+}: {
+  image: HTMLImageElement;
+  width: number;
+  height: number;
+  crop: CropRect;
+  onCropLive: (crop: CropRect) => void;
+}) {
+  const iw = image.naturalWidth || image.width;
+  const ih = image.naturalHeight || image.height;
+  const s = Math.min(width / Math.max(1, iw), height / Math.max(1, ih));
+  const dw = Math.max(1, iw * s);
+  const dh = Math.max(1, ih * s);
+  const ox = (width - dw) / 2;
+  const oy = (height - dh) / 2;
+
+  type CropGesture =
+    | { mode: "move"; sx: number; sy: number; orig: CropRect }
+    | { mode: "resize"; cfx: number; cfy: number; anchor: { x: number; y: number } };
+  const gestureRef = useRef<CropGesture | null>(null);
+
+  const clampCrop = (r: CropRect): CropRect => {
+    const w = Math.min(1, Math.max(MIN_CROP, r.w));
+    const h = Math.min(1, Math.max(MIN_CROP, r.h));
+    return {
+      x: Math.min(1 - w, Math.max(0, r.x)),
+      y: Math.min(1 - h, Math.max(0, r.y)),
+      w,
+      h,
+    };
+  };
+
+  const beginCropGesture = (
+    e: React.PointerEvent,
+    gesture: CropGesture,
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
+    gestureRef.current = gesture;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const endCropGesture = () => {
+    gestureRef.current = null;
+  };
+
+  const onCropMove = (e: React.PointerEvent) => {
+    const g = gestureRef.current;
+    if (!g) return;
+    const el = e.currentTarget as HTMLElement;
+    // Root editing memakai elemen terdekat ber-relatif untuk koordinat.
+    const root = el.closest("[data-crop-root]") as HTMLElement | null;
+    if (!root) return;
+    const r = root.getBoundingClientRect();
+    const fx = (e.clientX - r.left - ox) / dw;
+    const fy = (e.clientY - r.top - oy) / dh;
+    if (g.mode === "move") {
+      const dx = fx - g.sx;
+      const dy = fy - g.sy;
+      onCropLive(
+        clampCrop({ ...g.orig, x: g.orig.x + dx, y: g.orig.y + dy }),
+      );
+      return;
+    }
+    // Resize: jaga aspek crop terhadap box. Sudut bebas dua sumbu,
+    // tepi (0.5) hanya satu sumbu — sisi lainnya mengikuti rasio.
+    const boxAspect = height > 0 ? width / height : 1;
+    const ratio = boxAspect * (ih / Math.max(1, iw));
+    const rawW = Math.abs(fx - g.anchor.x);
+    const rawH = Math.abs(fy - g.anchor.y);
+    let nw: number;
+    let nh: number;
+    if (g.cfx === 0.5) {
+      nh = Math.max(rawH, MIN_CROP);
+      nw = nh * ratio;
+    } else if (g.cfy === 0.5) {
+      nw = Math.max(rawW, MIN_CROP);
+      nh = nw / ratio;
+    } else {
+      nw = Math.max(rawW, MIN_CROP);
+      nh = nw / ratio;
+    }
+    let nx =
+      g.cfx === 1
+        ? g.anchor.x
+        : g.cfx === 0
+          ? g.anchor.x - nw
+          : g.anchor.x - nw / 2;
+    let ny =
+      g.cfy === 1
+        ? g.anchor.y
+        : g.cfy === 0
+          ? g.anchor.y - nh
+          : g.anchor.y - nh / 2;
+    nx = Math.min(1, Math.max(0, nx));
+    ny = Math.min(1, Math.max(0, ny));
+    nw = Math.min(nw, 1 - nx);
+    nh = Math.min(nh, 1 - ny);
+    nw = Math.max(nw, MIN_CROP);
+    nh = Math.max(nh, MIN_CROP);
+    onCropLive({
+      x: Math.min(nx, 1 - nw),
+      y: Math.min(ny, 1 - nh),
+      w: nw,
+      h: nh,
+    });
+  };
+
+  const rx = ox + crop.x * dw;
+  const ry = oy + crop.y * dh;
+  const rw = crop.w * dw;
+  const rh = crop.h * dh;
+
+  return (
+    <div
+      data-crop-root
+      className="absolute touch-none select-none"
+      style={{ left: 0, top: 0, width, height }}
+      onPointerDown={(e) => {
+        // Klik DI DALAM kotak: langsung geser tanpa melompat.
+        // Klik DI LUAR kotak: pusatkan crop di titik itu lalu geser.
+        const el = e.currentTarget as HTMLElement;
+        const r = el.getBoundingClientRect();
+        const fx = (e.clientX - r.left - ox) / dw;
+        const fy = (e.clientY - r.top - oy) / dh;
+        const inside =
+          fx >= crop.x &&
+          fx <= crop.x + crop.w &&
+          fy >= crop.y &&
+          fy <= crop.y + crop.h;
+        const orig = inside
+          ? crop
+          : clampCrop({
+              ...crop,
+              x: fx - crop.w / 2,
+              y: fy - crop.h / 2,
+            });
+        if (!inside) onCropLive(orig);
+        beginCropGesture(e, { mode: "move", sx: fx, sy: fy, orig });
+      }}
+      onPointerMove={onCropMove}
+      onPointerUp={endCropGesture}
+      onPointerCancel={endCropGesture}
+      role="application"
+      aria-label="Editor crop: seret untuk memilih area gambar"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={image.src}
+        alt=""
+        aria-hidden
+        draggable={false}
+        style={{
+          left: ox,
+          top: oy,
+          width: dw,
+          height: dh,
+          filter: "brightness(0.45)",
+        }}
+        className="pointer-events-none absolute"
+      />
+      <div
+        aria-hidden
+        className="absolute border-2 border-white"
+        style={{
+          left: rx,
+          top: ry,
+          width: rw,
+          height: rh,
+          boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
+        }}
+      >
+        <div className="absolute inset-y-0 left-1/3 w-px bg-white/50" />
+        <div className="absolute inset-y-0 left-2/3 w-px bg-white/50" />
+        <div className="absolute inset-x-0 top-1/3 h-px bg-white/50" />
+        <div className="absolute inset-x-0 top-2/3 h-px bg-white/50" />
+      </div>
+      {(
+        [
+          { cfx: 0, cfy: 0, cursor: "cursor-nwse-resize" },
+          { cfx: 1, cfy: 0, cursor: "cursor-nesw-resize" },
+          { cfx: 0, cfy: 1, cursor: "cursor-nesw-resize" },
+          { cfx: 1, cfy: 1, cursor: "cursor-nwse-resize" },
+          { cfx: 0.5, cfy: 0, cursor: "cursor-ns-resize" },
+          { cfx: 0.5, cfy: 1, cursor: "cursor-ns-resize" },
+          { cfx: 0, cfy: 0.5, cursor: "cursor-ew-resize" },
+          { cfx: 1, cfy: 0.5, cursor: "cursor-ew-resize" },
+        ] as const
+      ).map((h) => (
+        <div
+          key={`${h.cfx}-${h.cfy}`}
+          onPointerDown={(e) => {
+            // Jangan biarkan menggelembung ke surface (akan menimpa
+            // gesture resize dengan gesture geser).
+            e.stopPropagation();
+            beginCropGesture(e, {
+              mode: "resize",
+              cfx: h.cfx,
+              cfy: h.cfy,
+              anchor: {
+                x: crop.x + (1 - h.cfx) * crop.w,
+                y: crop.y + (1 - h.cfy) * crop.h,
+              },
+            });
+          }}
+          onPointerMove={onCropMove}
+          onPointerUp={endCropGesture}
+          onPointerCancel={endCropGesture}
+          title="Seret untuk mengubah area crop"
+          className={`absolute h-4 w-4 touch-none rounded-full border-2 border-neutral-900 bg-white shadow ${h.cursor}`}
+          style={{
+            left: rx + h.cfx * rw,
+            top: ry + h.cfy * rh,
+            transform: "translate(-50%, -50%)",
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -282,6 +554,10 @@ export type TransformBoxProps = {
   selected: boolean;
   /** Hanya primer (terakhir dipilih) yang menampilkan gagang + bar. */
   showBar: boolean;
+  /** Mode crop inline aktif untuk box ini. */
+  cropping: boolean;
+  onToggleCrop: () => void;
+  onCropLive: (crop: CropRect) => void;
   /** Rasio alami gambar (kunci aspek) atau null untuk bebas. */
   aspectLock: number | null;
   onSelect: (additive: boolean) => void;
@@ -294,6 +570,7 @@ export type TransformBoxProps = {
   onToggleLock: () => void;
   onToggleVisibility: () => void;
   onDelete: () => void;
+  onCrop: (() => void) | null;
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -326,7 +603,13 @@ export default function TransformBox({
   onToggleLock,
   onToggleVisibility,
   onDelete,
+  onCrop,
+  cropping,
+  onToggleCrop,
+  onCropLive,
 }: TransformBoxProps) {
+  const cropMode =
+    cropping && overlay.type === "image" && !!image && !overlay.locked;
   const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 3) : 1;
   const gestureRef = useRef<Gesture | null>(null);
   const lastFrameRef = useRef<PixelFrame | null>(null);
@@ -579,10 +862,135 @@ export default function TransformBox({
     ? { left: barLeft, top: bboxBottom + 8, transform: "translateX(-50%)" }
     : { left: barLeft, top: bboxTop - 44, transform: "translateX(-50%)" };
 
+  // Crop inline: gantikan seluruh tampilan box dengan editor crop
+  // (permukaan axis-aligned selebar frame; crop tak bergantung rotasi).
+  const showCropEditor = cropMode && image;
+  const boxAspect = height > 0 ? width / height : 1;
+  const cropAspectImg =
+    image && (image.naturalWidth || image.width) > 0
+      ? (image.naturalHeight || image.height) /
+        Math.max(1, image.naturalWidth || image.width)
+      : 1;
+  const activeCrop: CropRect =
+    overlay.crop ?? defaultFullCrop(boxAspect, cropAspectImg);
+
+  // Zoom area crop terhadap titik tengahnya (faktor >1 = area menyempit).
+  const zoomCrop = (factor: number) => {
+    const ratio = boxAspect * cropAspectImg;
+    let nw = activeCrop.w * factor;
+    let nh = nw / ratio;
+    if (nh > 1) {
+      nh = 1;
+      nw = nh * ratio;
+    }
+    nw = Math.min(1, Math.max(MIN_CROP, nw));
+    nh = Math.min(1, Math.max(MIN_CROP, nh));
+    const cxp = activeCrop.x + activeCrop.w / 2;
+    const cyp = activeCrop.y + activeCrop.h / 2;
+    onCropLive({
+      x: Math.min(1 - nw, Math.max(0, cxp - nw / 2)),
+      y: Math.min(1 - nh, Math.max(0, cyp - nh / 2)),
+      w: nw,
+      h: nh,
+    });
+  };
+
   return (
     <div
       className={`pointer-events-none absolute inset-0 ${selected ? "z-20" : "z-10"}`}
     >
+      {showCropEditor && image ? (
+        <>
+          <div
+            className="absolute pointer-events-auto"
+            style={{ left: x, top: y, width, height }}
+          >
+            <CropEditor
+              image={image}
+              width={width}
+              height={height}
+              crop={activeCrop}
+              onCropLive={onCropLive}
+            />
+          </div>
+          <div
+            className="absolute z-20 pointer-events-auto"
+            style={barStyle}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div
+              role="toolbar"
+              aria-label="Aksi crop gambar"
+              className="animate-fade-in flex items-center gap-1.5 rounded-full border border-neutral-700 bg-black/85 p-1 pl-3 shadow-lg backdrop-blur"
+            >
+              <span className="text-xs font-medium text-neutral-300">
+                Potong gambar
+              </span>
+              <div
+                role="group"
+                aria-label="Zoom area crop"
+                className="flex items-center gap-0.5"
+              >
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={() => zoomCrop(1.25)}
+                  aria-label="Perkecil area crop (zoom masuk)"
+                  title="Perkecil area (zoom masuk)"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-base font-bold leading-none text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={() => zoomCrop(0.8)}
+                  aria-label="Perbesar area crop (zoom keluar)"
+                  title="Perbesar area (zoom keluar)"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-base font-bold leading-none text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white"
+                >
+                  +
+                </button>
+              </div>
+              <button
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={() =>
+                  onCropLive(defaultFullCrop(boxAspect, cropAspectImg))
+                }
+                title="Kembali ke gambar penuh"
+                className="rounded-full border border-neutral-700 px-2.5 py-1 text-xs font-medium text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={onToggleCrop}
+                aria-label="Selesai crop"
+                title="Selesai (Esc)"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-neutral-300"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+      <>
       {/* Lapisan konten (sudah termasuk rotasi bake di pikselnya).
           Bila disembunyikan: tampilkan placeholder garis agar user tahu
           overlay masih ada (tidak terhapus) dan bisa dipilih. */}
@@ -652,11 +1060,11 @@ export default function TransformBox({
           startDrag(e);
         }}
         onPointerMove={onPointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={() => {
-          downInfoRef.current = null;
-          finishGesture(false);
-        }}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={() => {
+            downInfoRef.current = null;
+            finishGesture(false);
+          }}
         role="button"
         aria-label={
           overlay.locked
@@ -675,8 +1083,8 @@ export default function TransformBox({
         />
       </div>
       )}
-
-      {selected && (
+      </>)}
+      {selected && !showCropEditor && (
         <>
           {/* Outline seleksi mengikuti sudut box (abu bila terkunci).
               Disembunyikan bila overlay hidden — placeholder sudah cukup. */}
@@ -780,6 +1188,7 @@ export default function TransformBox({
               onToggleLock={onToggleLock}
               onToggleVisibility={onToggleVisibility}
               onDelete={onDelete}
+              onCrop={onCrop}
             />
           </div>
           )}

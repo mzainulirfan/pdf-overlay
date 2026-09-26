@@ -87,6 +87,7 @@ function historyLabelForPatch(patch: Partial<Overlay>): string {
     patch.shape !== undefined
   )
     return "Ubah bentuk";
+  if (patch.crop !== undefined) return "Potong gambar";
   return "Ubah overlay";
 }
 
@@ -348,6 +349,11 @@ export default function PdfEditor() {
   const [previewWidth, setPreviewWidth] = useState(720);
   const [zoom, setZoom] = useState(1);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [cropId, setCropId] = useState<string | null>(null);
+
+  const toggleCrop = useCallback((id: string) => {
+    setCropId((prev) => (prev === id ? null : id));
+  }, []);
   const [shortcutOpen, setShortcutOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState(false);
   const [shapePresetOpen, setShapePresetOpen] = useState(false);
@@ -1063,6 +1069,7 @@ export default function PdfEditor() {
         setShapePresetOpen(false);
         setPendingFile(null);
         setShortcutOpen(false);
+        setCropId(null);
         if (!isTyping) setSelection(new Set());
         return;
       }
@@ -1557,6 +1564,12 @@ export default function PdfEditor() {
                   onDuplicate={duplicateOverlay}
                   onToggleLock={toggleOverlayLock}
                   onToggleVisibility={toggleOverlayVisibility}
+                  onCropImage={toggleCrop}
+                  cropId={cropId}
+                  onToggleCropImage={toggleCrop}
+                  onCropLive={(id, crop) =>
+                    updateOverlayWithHistory(id, { crop })
+                  }
                 />
               </div>
             ) : null}
@@ -1646,6 +1659,13 @@ export default function PdfEditor() {
                   overlay={primaryOverlay}
                   onChange={(patch) =>
                     updateOverlayWithHistory(primaryOverlay.id, patch)
+                  }
+                  onCropImage={
+                    primaryOverlay.type === "image" &&
+                    overlayImages[primaryOverlay.id] &&
+                    !primaryOverlay.locked
+                      ? () => toggleCrop(primaryOverlay.id)
+                      : undefined
                   }
                 />
               ) : overlays.length === 0 ? (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import type { Overlay } from "@/types/overlay";
+import type { CropRect, Overlay } from "@/types/overlay";
 import { ratiosFromPixel } from "@/lib/coordinate-converter";
 import TransformBox, { type PixelFrame } from "@/components/pdf/TransformBox";
 
@@ -23,6 +23,10 @@ type PdfPagePreviewProps = {
   onDuplicate: (id: string) => void;
   onToggleLock: (id: string) => void;
   onToggleVisibility: (id: string) => void;
+  onCropImage: (id: string) => void;
+  cropId: string | null;
+  onToggleCropImage: (id: string) => void;
+  onCropLive: (id: string, crop: CropRect) => void;
 };
 
 export default function PdfPagePreview({
@@ -43,6 +47,10 @@ export default function PdfPagePreview({
   onDuplicate,
   onToggleLock,
   onToggleVisibility,
+  onCropImage,
+  cropId,
+  onToggleCropImage,
+  onCropLive,
 }: PdfPagePreviewProps) {
   // Mahal untuk PDF besar — hitung sekali per objek canvas, bukan tiap render.
   const pageImageUrl = useMemo(
@@ -238,6 +246,14 @@ export default function PdfPagePreview({
               onToggleLock={() => onToggleLock(overlay.id)}
               onToggleVisibility={() => onToggleVisibility(overlay.id)}
               onDelete={() => onDelete(overlay.id)}
+              onCrop={
+                overlay.type === "image" && naturalImage
+                  ? () => onCropImage(overlay.id)
+                  : null
+              }
+              cropping={cropId === overlay.id}
+              onToggleCrop={() => onToggleCropImage(overlay.id)}
+              onCropLive={(crop) => onCropLive(overlay.id, crop)}
             />
           );
         })}

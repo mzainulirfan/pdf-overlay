@@ -57,7 +57,7 @@ export function renderOverlayToCanvas(
   if (overlay.type === "text") {
     drawText(ctx, overlay, width, height);
   } else if (overlay.type === "image") {
-    drawImage(ctx, image, width, height);
+    drawImage(ctx, overlay, image, width, height);
   } else if (overlay.type === "shape") {
     drawShape(ctx, overlay, width, height);
   }
@@ -281,17 +281,42 @@ function measureTextWidth(
 
 function drawImage(
   ctx: CanvasRenderingContext2D,
+  overlay: Overlay,
   image: HTMLImageElement | null | undefined,
   width: number,
   height: number,
 ) {
-  if (!image || image.width === 0) return;
+  if (!image || image.width === 0 || image.height === 0) return;
 
-  const scale = Math.min(width / image.width, height / image.height);
-  const drawWidth = image.width * scale;
-  const drawHeight = image.height * scale;
-  const dx = (width - drawWidth) / 2;
-  const dy = (height - drawHeight) / 2;
+  // Tanpa crop: contain (seluruh gambar muat, letterbox bila perlu).
+  if (!overlay.crop) {
+    const scale = Math.min(width / image.width, height / image.height);
+    const drawWidth = image.width * scale;
+    const drawHeight = image.height * scale;
+    const dx = (width - drawWidth) / 2;
+    const dy = (height - drawHeight) / 2;
+    ctx.drawImage(image, dx, dy, drawWidth, drawHeight);
+    return;
+  }
 
-  ctx.drawImage(image, dx, dy, drawWidth, drawHeight);
+  // Crop: area terpilih mengisi penuh box (cover, tanpa distorsi).
+  // Bila aspek crop vs box tak sama (box di-resize setelah crop),
+  // crop disempitkan terpusat agar pas.
+  const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+  const cx = clamp01(overlay.crop.x);
+  const cy = clamp01(overlay.crop.y);
+  const cw = Math.min(1 - cx, Math.max(0.01, overlay.crop.w));
+  const ch = Math.min(1 - cy, Math.max(0.01, overlay.crop.h));
+  const destAspect = width / Math.max(1, height);
+  let sw = cw * image.width;
+  let sh = ch * image.height;
+  const cropAspect = sw / Math.max(1, sh);
+  if (cropAspect > destAspect) {
+    sw = sh * destAspect;
+  } else if (cropAspect < destAspect) {
+    sh = sw / destAspect;
+  }
+  const sx = (cx + cw / 2) * image.width - sw / 2;
+  const sy = (cy + ch / 2) * image.height - sh / 2;
+  ctx.drawImage(image, sx, sy, sw, sh, 0, 0, width, height);
 }

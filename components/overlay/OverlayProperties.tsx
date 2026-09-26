@@ -152,6 +152,7 @@ function ShapeControls({
 type OverlayPropertiesProps = {
   overlay: Overlay;
   onChange: (patch: Partial<Overlay>) => void;
+  onCropImage?: () => void;
 };
 
 /** Panel ringkas saat >1 overlay dipilih: hanya aksi massal yang aman. */
@@ -299,6 +300,7 @@ const input =
 export default function OverlayProperties({
   overlay,
   onChange,
+  onCropImage,
 }: OverlayPropertiesProps) {
   const spots = alignSpots(overlay);
   // Tampilan slider memakai rentang -180..180 (minus = berlawanan jarum jam).
@@ -449,6 +451,16 @@ export default function OverlayProperties({
           Geser untuk memindah. Tarik gagang untuk mengubah panjang dan lebar.
           Atur transparansi lewat slider di bawah.
         </div>
+      )}
+
+      {overlay.type === "image" && onCropImage && (
+        <button
+          type="button"
+          onClick={onCropImage}
+          className="rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
+        >
+          Potong gambar
+        </button>
       )}
 
       <div className="flex flex-col gap-1.5">
