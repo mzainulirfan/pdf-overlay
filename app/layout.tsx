@@ -13,10 +13,25 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_TITLE = "Cap — Stempel PDF Langsung di Browser";
+const SITE_DESCRIPTION =
+  "Cap dokumen PDF dengan tanda FRAGILE, logo, atau kotak penanda. Berlaku ke semua halaman — tanpa upload, tanpa daftar, tanpa ribet.";
+
 export const metadata: Metadata = {
-  title: "PDF Overlay Editor",
-  description:
-    "Tambahkan overlay seperti FRAGILE ke semua halaman PDF langsung di browser, tanpa mengunggah file.",
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    type: "website",
+    locale: "id_ID",
+    siteName: "Cap",
+  },
+  twitter: {
+    card: "summary",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

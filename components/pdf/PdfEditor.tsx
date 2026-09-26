@@ -38,6 +38,7 @@ import {
 import ErrorMessage from "@/components/common/ErrorMessage";
 import LoadingState from "@/components/common/LoadingState";
 import Toast, { type ToastData } from "@/components/common/Toast";
+import BrandLogo from "@/components/common/BrandLogo";
 import PdfUploader from "@/components/pdf/PdfUploader";
 import PdfNavigation from "@/components/pdf/PdfNavigation";
 import PdfPagePreview from "@/components/pdf/PdfPagePreview";
@@ -1024,7 +1025,7 @@ export default function PdfEditor() {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    pushToast("success", "PDF berhasil dibuat dan siap diunduh.");
+    pushToast("success", "PDF berhasil di-cap dan siap diunduh.");
   }, [withExportGuard, buildExportBytes, pdfInfo, pushToast]);
 
   const handlePrint = useCallback(async () => {
@@ -1255,21 +1256,7 @@ export default function PdfEditor() {
       <header className="sticky top-0 z-20 -mx-6 border-b border-neutral-800 bg-black/85 px-6 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-black">
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.8}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M7 21h10a2 2 0 0 0 2-2V9.414a1 1 0 0 0-.293-.707l-5.414-5.414A1 1 0 0 0 12.586 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"
-                />
-              </svg>
-            </div>
+            <BrandLogo size={9} />
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold text-neutral-100">
                 {pdfInfo.fileName}

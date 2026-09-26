@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { isLikelyPdfFile, validatePdfFile } from "@/lib/file-validator";
+import BrandLogo from "@/components/common/BrandLogo";
 
 type PdfUploaderProps = {
   onSelect: (file: File) => void;
@@ -101,24 +102,9 @@ export default function PdfUploader({ onSelect, onSelectUrl, onReplayTour }: Pdf
       {/* Top bar minimal */}
       <div className="flex w-full max-w-3xl items-center justify-between py-6">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-black">
-            <svg
-              className="h-4.5 w-4.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M7 21h10a2 2 0 0 0 2-2V9.414a1 1 0 0 0-.293-.707l-5.414-5.414A1 1 0 0 0 12.586 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"
-              />
-            </svg>
-          </div>
+          <BrandLogo />
           <span className="text-sm font-semibold tracking-tight text-neutral-100">
-            PDF Overlay
+            Cap
           </span>
         </div>
         <button
@@ -133,20 +119,36 @@ export default function PdfUploader({ onSelect, onSelectUrl, onReplayTour }: Pdf
 
       {/* Hero minimal */}
       <div className="flex flex-col items-center text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white">
-          <span className="h-1.5 w-1.5 rounded-full bg-white" />
-          100% di browser · tanpa upload
+        <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-200">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+          Tukang stempel digital · tanpa upload
         </div>
 
         <h1 className="mt-5 max-w-2xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
-          Beri tanda <span className="text-amber-400">FRAGILE</span>
+          Cap PDF dalam
           <br />
-          ke seluruh halaman PDF
+          hitungan <span className="text-amber-400">detik</span>
         </h1>
         <p className="mt-3 max-w-xl text-base leading-relaxed text-neutral-400">
-          Buka PDF, susun overlay teks, gambar, atau kotak penanda, lalu
-          simpan atau cetak. Selesai dalam hitungan detik.
+          Tempel tanda FRAGILE, logo, atau kotak penanda ke semua halaman —
+          tanpa upload, tanpa daftar, tanpa ribet.
         </p>
+
+        {/* Strip contoh hasil cap */}
+        <div
+          aria-hidden
+          className="mt-5 flex flex-wrap items-center justify-center gap-2"
+        >
+          <span className="inline-block -rotate-6 rounded border-2 border-amber-400 px-2.5 py-1 text-xs font-black tracking-widest text-amber-400">
+            FRAGILE
+          </span>
+          <span className="inline-block rotate-3 rounded border border-neutral-500 px-2.5 py-1 text-xs font-semibold tracking-wide text-neutral-300">
+            26 Sep 2026
+          </span>
+          <span className="inline-block -rotate-2 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-black">
+            ✓ CETAK
+          </span>
+        </div>
       </div>
 
       {/* Cara membuka: dropzone + tempel + URL dalam satu grup */}
@@ -414,6 +416,9 @@ export default function PdfUploader({ onSelect, onSelectUrl, onReplayTour }: Pdf
       <p className="mt-8 text-center text-xs leading-relaxed text-neutral-600">
         PDF maks 25 MB · 100 halaman · .pdf — file perangkat tidak diunggah,
         kecuali via URL non-CORS.
+      </p>
+      <p className="mt-2 text-center text-xs text-neutral-700">
+        Cap — tukang stempel digital untuk dokumenmu.
       </p>
     </div>
   );
