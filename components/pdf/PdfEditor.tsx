@@ -363,6 +363,24 @@ export default function PdfEditor() {
     setCropId((prev) => (prev === id ? null : id));
   }, []);
   const [shortcutOpen, setShortcutOpen] = useState(false);
+  // Bottom sheet mobile: peek (rintisan) / half / full.
+  const [sheetSnap, setSheetSnap] = useState<"peek" | "half" | "full">("peek");
+  const [sheetDragging, setSheetDragging] = useState(false);
+  const sheetRef = useRef<HTMLElement | null>(null);
+  const sheetDragRef = useRef<{ startY: number; startH: number; moved: boolean } | null>(null);
+  const SHEET_PEEK_H = 128;
+
+  const snapSheetTo = useCallback((snap: "peek" | "half" | "full") => {
+    setSheetSnap(snap);
+    if (sheetRef.current) sheetRef.current.style.height = "";
+  }, []);
+
+  const sheetHeightClass =
+    sheetSnap === "peek"
+      ? "h-[128px] lg:h-auto"
+      : sheetSnap === "half"
+        ? "h-[50dvh] lg:h-auto"
+        : "h-[85dvh] lg:h-auto";
   const [presetOpen, setPresetOpen] = useState(false);
   const [shapePresetOpen, setShapePresetOpen] = useState(false);
   const exportTitleRef = useRef<HTMLParagraphElement>(null);
@@ -1108,7 +1126,8 @@ export default function PdfEditor() {
     setSelection(new Set());
     setError(null);
     clearHistory();
-  }, [clearHistory]);
+    snapSheetTo("peek");
+  }, [clearHistory, snapSheetTo]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1231,7 +1250,7 @@ export default function PdfEditor() {
       .find((o): o is Overlay => !!o) ?? null;
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pb-12">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pb-40 lg:pb-12">
       {/* Header */}
       <header className="sticky top-0 z-20 -mx-6 border-b border-neutral-800 bg-black/85 px-6 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1323,8 +1342,8 @@ export default function PdfEditor() {
       {/* Main */}
       <div className="flex flex-col gap-8 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col items-center gap-4">
-          {/* Floating toolbar: tambah + zoom, menempel saat scroll */}
-          <div data-tour="toolbar" className="sticky top-[72px] z-20 flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-neutral-800 bg-black/85 p-1.5 shadow-xl shadow-black/50 backdrop-blur">
+          {/* Floating toolbar: tambah + zoom, menempel saat scroll di desktop */}
+          <div data-tour="toolbar" className="static z-20 flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-neutral-800 bg-black/85 p-1.5 shadow-xl shadow-black/50 backdrop-blur lg:sticky lg:top-[72px]">
             <div
               role="group"
               aria-label="Tambah overlay"
@@ -1344,7 +1363,7 @@ export default function PdfEditor() {
                     >
                       T
                     </span>
-                    <span className="max-w-28 truncate">FRAGILE</span>
+                    <span className="hidden max-w-28 truncate sm:inline">FRAGILE</span>
                   </button>
                   <button
                     type="button"
@@ -1420,7 +1439,7 @@ export default function PdfEditor() {
                     d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0 0 21.75 19.5V4.5A1.5 1.5 0 0 0 20.25 3H3.75A1.5 1.5 0 0 0 2.25 4.5v15A1.5 1.5 0 0 0 3.75 21zM11.25 7.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5z"
                   />
                 </svg>
-                Gambar
+                <span className="hidden sm:inline">Gambar</span>
               </button>
               <div className="relative">
                 <div className="flex">
@@ -1436,10 +1455,10 @@ export default function PdfEditor() {
                       viewBox="0 0 24 24"
                       aria-hidden
                     >
-                      <rect x="4" y="7" width="16" height="10" rx="1" />
-                    </svg>
-                    Bentuk
-                  </button>
+                    <rect x="4" y="7" width="16" height="10" rx="1" />
+                </svg>
+                <span className="hidden sm:inline">Bentuk</span>
+              </button>
                   <button
                     type="button"
                     onClick={() => setShapePresetOpen((v) => !v)}
@@ -1536,7 +1555,7 @@ export default function PdfEditor() {
                     d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
                   />
                 </svg>
-                Template
+                <span className="hidden sm:inline">Template</span>
                 {templates.length > 0 && (
                   <span
                     aria-hidden
@@ -1643,6 +1662,7 @@ export default function PdfEditor() {
                     lastAnchorRef.current = null;
                   }}
                   getSelection={getSelection}
+                  onCanvasDoubleClick={() => snapSheetTo("peek")}
                   onChange={updateOverlayWithHistory}
                   onDelete={deleteOverlay}
                   onReset={resetOverlay}
@@ -1659,7 +1679,7 @@ export default function PdfEditor() {
               </div>
             ) : null}
           </div>
-          <div className="sticky bottom-3 z-10">
+          <div className="sticky bottom-[140px] z-10 lg:bottom-3">
             <PdfNavigation
               currentPage={currentPage}
               totalPages={pdfInfo.totalPages}
@@ -1670,7 +1690,110 @@ export default function PdfEditor() {
           </div>
         </div>
 
-        <aside data-tour="sidebar" className="flex w-full flex-col gap-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-80 lg:shrink-0 lg:overflow-y-auto">
+        <aside
+          data-tour="sidebar"
+          ref={sheetRef}
+          className={`fixed inset-x-0 bottom-0 z-30 flex flex-col gap-0 rounded-t-3xl border-t border-neutral-800 bg-neutral-950/95 shadow-2xl backdrop-blur transition-[height] duration-300 ease-out lg:static lg:z-auto lg:flex lg:max-h-[calc(100vh-6rem)] lg:w-80 lg:shrink-0 lg:gap-4 lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none lg:backdrop-blur-0 ${sheetDragging ? "transition-none" : ""} ${sheetHeightClass}`}
+        >
+          {/* Gagang tarik bottom sheet (khusus mobile) */}
+          <div
+            className="flex shrink-0 touch-none select-none flex-col gap-1 px-4 pb-1 pt-2.5 lg:hidden"
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              sheetDragRef.current = {
+                startY: e.clientY,
+                startH:
+                  sheetRef.current?.getBoundingClientRect().height ??
+                  SHEET_PEEK_H,
+                moved: false,
+              };
+              setSheetDragging(true);
+            }}
+            onPointerMove={(e) => {
+              const d = sheetDragRef.current;
+              const el = sheetRef.current;
+              if (!d || !el) return;
+              if (Math.abs(e.clientY - d.startY) > 6) d.moved = true;
+              const h = Math.min(
+                Math.max(d.startH + (d.startY - e.clientY), 96),
+                window.innerHeight * 0.92,
+              );
+              el.style.height = `${Math.round(h)}px`;
+            }}
+            onPointerUp={() => {
+              const d = sheetDragRef.current;
+              sheetDragRef.current = null;
+              setSheetDragging(false);
+              const el = sheetRef.current;
+              if (!el) return;
+              if (!d?.moved) {
+                // Ketuk: putar peek → half → full → peek.
+                snapSheetTo(
+                  sheetSnap === "peek"
+                    ? "half"
+                    : sheetSnap === "half"
+                      ? "full"
+                      : "peek",
+                );
+                return;
+              }
+              const h = el.getBoundingClientRect().height;
+              const vh = window.innerHeight;
+              const cands: { snap: "peek" | "half" | "full"; px: number }[] = [
+                { snap: "peek", px: SHEET_PEEK_H },
+                { snap: "half", px: vh * 0.5 },
+                { snap: "full", px: vh * 0.85 },
+              ];
+              cands.sort(
+                (a, b) => Math.abs(h - a.px) - Math.abs(h - b.px),
+              );
+              snapSheetTo(cands[0].snap);
+            }}
+            onPointerCancel={() => {
+              sheetDragRef.current = null;
+              setSheetDragging(false);
+              if (sheetRef.current) sheetRef.current.style.height = "";
+            }}
+          >
+            <div
+              aria-hidden
+              className="mx-auto h-1.5 w-12 shrink-0 rounded-full bg-neutral-600"
+            />
+            <div className="flex items-center gap-3">
+              <span className="truncate text-xs text-neutral-500">
+                {overlays.length} overlay
+                {selectedOverlays.length > 0 &&
+                  ` · ${selectedOverlays.length} dipilih`}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  snapSheetTo(sheetSnap === "peek" ? "half" : "peek")
+                }
+                aria-expanded={sheetSnap !== "peek"}
+                aria-label={
+                  sheetSnap === "peek" ? "Buka panel" : "Ciutkan panel"
+                }
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
+              >
+                <svg
+                  className={`h-4 w-4 transition-transform ${sheetSnap === "peek" ? "rotate-180" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 15l6-6 6 6"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4 lg:contents lg:overflow-visible lg:p-0">
           <section
             aria-labelledby="overlay-panel-title"
             className="flex flex-col gap-4 rounded-2xl border border-neutral-800 bg-neutral-900 p-5"
@@ -1680,7 +1803,7 @@ export default function PdfEditor() {
                 id="overlay-panel-title"
                 className="text-sm font-semibold text-neutral-100"
               >
-                Overlay
+                Lapisan
               </h2>
               <span
                 aria-label={`${overlays.length} overlay`}
@@ -1703,6 +1826,11 @@ export default function PdfEditor() {
                 updateOverlayWithHistory(id, { name })
               }
             />
+          </section>
+          <section
+            aria-label="Properti overlay"
+            className="flex flex-col gap-4 rounded-2xl border border-neutral-800 bg-neutral-900 p-5"
+          >
             <div>
               {selectedOverlays.length > 1 ? (
                 <BulkOverlayProperties
@@ -1774,6 +1902,7 @@ export default function PdfEditor() {
               )}
             </div>
           </section>
+          </div>
         </aside>
       </div>
 

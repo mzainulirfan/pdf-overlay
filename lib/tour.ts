@@ -142,5 +142,12 @@ export function startHomeTour(onDone: () => void): Promise<Driver | null> {
 }
 
 export function startEditorTour(onDone: () => void): Promise<Driver | null> {
-  return startTour(EDITOR_STEPS, onDone);
+  // Di layar kecil sidebar adalah display:contents (tanpa box) karena
+  // navigasi memakai tab — langkahnya dilewati agar sorotan tidak ngawur.
+  const isSmallScreen =
+    typeof window !== "undefined" && window.innerWidth < 1024;
+  const steps = isSmallScreen
+    ? EDITOR_STEPS.filter((s) => s.element !== '[data-tour="sidebar"]')
+    : EDITOR_STEPS;
+  return startTour(steps, onDone);
 }

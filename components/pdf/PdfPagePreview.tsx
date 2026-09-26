@@ -17,6 +17,7 @@ type PdfPagePreviewProps = {
   onNarrowSelection: (id: string) => void;
   onEmptyClick: () => void;
   getSelection: () => Set<string>;
+  onCanvasDoubleClick?: () => void;
   onChange: (id: string, patch: Partial<Overlay>) => void;
   onDelete: (id: string) => void;
   onReset: (id: string) => void;
@@ -41,6 +42,7 @@ export default function PdfPagePreview({
   onNarrowSelection,
   onEmptyClick,
   getSelection,
+  onCanvasDoubleClick,
   onChange,
   onDelete,
   onReset,
@@ -182,6 +184,7 @@ export default function PdfPagePreview({
       onMouseDown={(e) => {
         if (!e.shiftKey && !e.ctrlKey && !e.metaKey) onEmptyClick();
       }}
+      onDoubleClick={() => onCanvasDoubleClick?.()}
       className="relative select-none overflow-hidden bg-white shadow-xl shadow-black/40 ring-1 ring-neutral-800"
     >
       {pageImageUrl && (
