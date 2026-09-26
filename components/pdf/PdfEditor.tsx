@@ -47,6 +47,14 @@ import OverlayProperties, {
 } from "@/components/overlay/OverlayProperties";
 import TemplateDialog from "@/components/template/TemplateDialog";
 import ShortcutHelp from "@/components/pdf/ShortcutHelp";
+import {
+  hasSeenTour,
+  markTourSeen,
+  startEditorTour,
+  startHomeTour,
+  TOUR_EDITOR_SEEN_KEY,
+  TOUR_HOME_SEEN_KEY,
+} from "@/lib/tour";
 
 type PdfjsDoc = PDFDocumentProxy;
 
@@ -358,6 +366,73 @@ export default function PdfEditor() {
   const [presetOpen, setPresetOpen] = useState(false);
   const [shapePresetOpen, setShapePresetOpen] = useState(false);
   const exportTitleRef = useRef<HTMLParagraphElement>(null);
+
+  // Tur panduan (driver.js): ref agar bisa dihancurkan saat pindah halaman.
+  const tourRef = useRef<{ destroy: () => void } | null>(null);
+  const editorTourStartedRef = useRef(false);
+
+  const destroyTour = useCallback(() => {
+    tourRef.current?.destroy();
+    tourRef.current = null;
+  }, []);
+
+  const replayHomeTour = useCallback(() => {
+    destroyTour();
+    void startHomeTour(() => markTourSeen(TOUR_HOME_SEEN_KEY)).then((d) => {
+      tourRef.current = d;
+    });
+  }, [destroyTour]);
+
+  const replayEditorTour = useCallback(() => {
+    destroyTour();
+    void startEditorTour(() => markTourSeen(TOUR_EDITOR_SEEN_KEY)).then(
+      (d) => {
+        tourRef.current = d;
+      },
+    );
+  }, [destroyTour]);
+
+  // Otomatis: tur home saat pertama landing.
+  useEffect(() => {
+    if (pdfInfo || pdfDoc) return;
+    if (hasSeenTour(TOUR_HOME_SEEN_KEY)) return;
+    const t = window.setTimeout(() => {
+      if (tourRef.current) return;
+      void startHomeTour(() => markTourSeen(TOUR_HOME_SEEN_KEY)).then((d) => {
+        tourRef.current = d;
+      });
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [pdfInfo, pdfDoc]);
+
+  // Otomatis: tur editor saat PDF pertama dibuka.
+  useEffect(() => {
+    if (!pdfDoc || editorTourStartedRef.current) return;
+    if (hasSeenTour(TOUR_EDITOR_SEEN_KEY)) return;
+    editorTourStartedRef.current = true;
+    const t = window.setTimeout(() => {
+      if (!pdfDoc || tourRef.current) return;
+      void startEditorTour(() => markTourSeen(TOUR_EDITOR_SEEN_KEY)).then(
+        (d) => {
+          tourRef.current = d;
+        },
+      );
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [pdfDoc]);
+
+  // Hancurkan tur yang sedang jalan saat dokumen diganti/ditutup.
+  useEffect(() => {
+    if (pdfInfo) destroyTour();
+  }, [pdfInfo, destroyTour]);
+
+  useEffect(
+    () => () => {
+      tourRef.current?.destroy();
+      tourRef.current = null;
+    },
+    [],
+  );
 
   const TEXT_PRESETS = [
     "FRAGILE",
@@ -1131,7 +1206,7 @@ export default function PdfEditor() {
   if (!pdfInfo || !pdfDoc) {
     return (
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 pb-16">
-        <PdfUploader onSelect={handleSelectFile} onSelectUrl={handleSelectUrl} />
+        <PdfUploader onSelect={handleSelectFile} onSelectUrl={handleSelectUrl} onReplayTour={replayHomeTour} />
         {error && <ErrorMessage message={error} />}
         <Toast toasts={toasts} onDismiss={dismissToast} />
       </main>
@@ -1203,6 +1278,14 @@ export default function PdfEditor() {
             </button>
             <button
               type="button"
+              onClick={replayEditorTour}
+              title="Putar ulang tur panduan editor"
+              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800"
+            >
+              Tur
+            </button>
+            <button
+              type="button"
               onClick={resetToUpload}
               className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-800"
             >
@@ -1221,6 +1304,7 @@ export default function PdfEditor() {
               type="button"
               onClick={handleExport}
               disabled={exportDisabled}
+              data-tour="save"
               title={exportDisabled ? exportDisabledReason : "Simpan sebagai PDF baru"}
               className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -1240,7 +1324,7 @@ export default function PdfEditor() {
       <div className="flex flex-col gap-8 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col items-center gap-4">
           {/* Floating toolbar: tambah + zoom, menempel saat scroll */}
-          <div className="sticky top-[72px] z-20 flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-neutral-800 bg-black/85 p-1.5 shadow-xl shadow-black/50 backdrop-blur">
+          <div data-tour="toolbar" className="sticky top-[72px] z-20 flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-neutral-800 bg-black/85 p-1.5 shadow-xl shadow-black/50 backdrop-blur">
             <div
               role="group"
               aria-label="Tambah overlay"
@@ -1533,6 +1617,7 @@ export default function PdfEditor() {
 
           <div
             ref={previewContainerRef}
+            data-tour="canvas"
             className="w-full max-w-3xl overflow-x-auto"
           >
             {isRendering && pageCanvas === null ? (
@@ -1585,7 +1670,7 @@ export default function PdfEditor() {
           </div>
         </div>
 
-        <aside className="flex w-full flex-col gap-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-80 lg:shrink-0 lg:overflow-y-auto">
+        <aside data-tour="sidebar" className="flex w-full flex-col gap-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-80 lg:shrink-0 lg:overflow-y-auto">
           <section
             aria-labelledby="overlay-panel-title"
             className="flex flex-col gap-4 rounded-2xl border border-neutral-800 bg-neutral-900 p-5"

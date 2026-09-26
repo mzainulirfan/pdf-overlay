@@ -107,6 +107,71 @@ body {
   min-height: 0;
 }
 
+/* Tema driver.js (tur panduan) mengikuti monokrom aplikasi */
+.driver-popover.pdf-tour-popover {
+  background-color: #0a0a0a;
+  color: #fafafa;
+  border: 1px solid #262626;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.6);
+  font-family: var(--font-sans);
+  max-width: 320px;
+}
+.driver-popover.pdf-tour-popover .driver-popover-title {
+  color: #fafafa;
+  font-size: 15px;
+}
+.driver-popover.pdf-tour-popover .driver-popover-description {
+  color: #a3a3a3;
+  font-size: 13px;
+}
+.driver-popover.pdf-tour-popover .driver-popover-close-btn {
+  color: #737373;
+}
+.driver-popover.pdf-tour-popover .driver-popover-close-btn:hover,
+.driver-popover.pdf-tour-popover .driver-popover-close-btn:focus {
+  color: #fafafa;
+}
+.driver-popover.pdf-tour-popover .driver-popover-progress-text {
+  color: #737373;
+}
+.driver-popover.pdf-tour-popover .driver-popover-footer-btn {
+  background-color: #fafafa;
+  border-color: #fafafa;
+  color: #000000;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.driver-popover.pdf-tour-popover .driver-popover-footer-btn:hover,
+.driver-popover.pdf-tour-popover .driver-popover-footer-btn:focus {
+  background-color: #d4d4d4;
+}
+.driver-popover.pdf-tour-popover .driver-popover-arrow {
+  border: 5px solid #0a0a0a;
+}
+.driver-popover.pdf-tour-popover .driver-popover-arrow-side-left {
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-right-color: transparent;
+}
+.driver-popover.pdf-tour-popover .driver-popover-arrow-side-right {
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+}
+.driver-popover.pdf-tour-popover .driver-popover-arrow-side-top {
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+.driver-popover.pdf-tour-popover .driver-popover-arrow-side-bottom {
+  border-top-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+
 /* Range slider modern (dark) */
 input[type="range"] {
   height: 4px;

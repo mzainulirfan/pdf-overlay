@@ -6,6 +6,7 @@ import { isLikelyPdfFile, validatePdfFile } from "@/lib/file-validator";
 type PdfUploaderProps = {
   onSelect: (file: File) => void;
   onSelectUrl: (url: string) => Promise<void> | void;
+  onReplayTour: () => void;
 };
 
 const STEPS = [
@@ -47,7 +48,7 @@ const FEATURES = [
   },
 ];
 
-export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps) {
+export default function PdfUploader({ onSelect, onSelectUrl, onReplayTour }: PdfUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -120,6 +121,14 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
             PDF Overlay
           </span>
         </div>
+        <button
+          type="button"
+          onClick={onReplayTour}
+          title="Putar ulang tur panduan"
+          className="rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs font-medium text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-neutral-200"
+        >
+          Tur panduan
+        </button>
       </div>
 
       {/* Hero minimal */}
@@ -147,6 +156,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
       >
       <div
         role="group"
+        data-tour="dropzone"
         aria-labelledby="pdf-dropzone-title"
         aria-describedby="pdf-dropzone-hint"
         onDragEnter={(e) => {
@@ -167,7 +177,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
           setIsDragging(false);
           onDrop(e);
         }}
-        className={`flex w-full flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-8 py-8 transition-all duration-200 ${
+        className={`flex w-full flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-all duration-200 sm:px-8 ${
           isDragging
             ? "scale-[1.01] border-white bg-white/10"
             : "border-neutral-800 bg-neutral-900/60 hover:border-neutral-700 hover:bg-neutral-900"
@@ -195,7 +205,7 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
             />
           </svg>
         </div>
-        <div>
+        <div className="text-center">
           <p
             id="pdf-dropzone-title"
             className="text-base font-semibold text-neutral-100"
@@ -240,7 +250,8 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
         </p>
       )}
 
-      <p className="mt-1 text-xs text-neutral-500">
+      <div data-tour="open-options" className="flex w-full flex-col items-center gap-1">
+      <p className="mt-1 text-center text-xs text-neutral-500">
         Tip: salin file PDF lalu tempel dengan Ctrl+V
       </p>
 
@@ -328,11 +339,13 @@ export default function PdfUploader({ onSelect, onSelectUrl }: PdfUploaderProps)
           </div>
         )}
       </div>
+      </div>
       </section>
 
       {/* Cara kerja */}
       <section
         aria-labelledby="how-it-works"
+        data-tour="how-it-works"
         className="mt-10 w-full max-w-3xl"
       >
         <h2
