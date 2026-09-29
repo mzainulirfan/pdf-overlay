@@ -213,6 +213,13 @@ export default function PdfEditor() {
   const pastRef = useRef<HistoryEntry[]>([]);
   const futureRef = useRef<HistoryEntry[]>([]);
   const lastPushRef = useRef<{ label: string; at: number } | null>(null);
+  // True bila dokumen saat ini mengandung kerja asli pengguna (tambah/ubah/
+  // hapus overlay, terapkan template manual). Overlay hasil penerapan
+  // template OTOMATIS saat buka file TIDAK menandai dirty — tidak ada yang
+  // hilang tak tergantikan bila dokumen diganti (template aktif dipakai
+  // ulang otomatis). Dipakai untuk memutuskan perlu tidaknya konfirmasi
+  // "Ganti PDF?".
+  const userDirtyRef = useRef(false);
   const overlaysRef = useRef(overlays);
   const imagesRef = useRef(overlayImages);
 
@@ -233,6 +240,10 @@ export default function PdfEditor() {
   });
 
   const pushHistory = useCallback((label: string) => {
+    // Setiap mutasi pengguna menandai dokumen sebagai berisi kerja asli,
+    // termasuk yang ter-coalesce (mutasi tetap terjadi walau snapshot
+    // digabung).
+    userDirtyRef.current = true;
     const now = Date.now();
     const last = lastPushRef.current;
     if (last && last.label === label && now - last.at < HISTORY_COALESCE_MS)
@@ -284,6 +295,9 @@ export default function PdfEditor() {
     pastRef.current = [];
     futureRef.current = [];
     lastPushRef.current = null;
+    // Dipanggil tepat saat dokumen fresh dimulai (buka file sukses,
+    // kembali ke unggah): tidak ada kerja pengguna yang perlu dilindungi.
+    userDirtyRef.current = false;
   }, []);
 
   const deleteOverlay = useCallback(
@@ -663,9 +677,13 @@ export default function PdfEditor() {
 
   const handleSelectFile = useCallback(
     async (file: File) => {
-      // Dokumen aktif berisi overlay → minta konfirmasi dulu agar kerja
-      // tidak hilang diam-diam (drop/paste/pilih file sama-sama lewat sini).
-      if (pdfInfo && overlays.length > 0) {
+      // Dokumen aktif berisi KERJA PENGGUNA → minta konfirmasi dulu agar
+      // kerja tidak hilang diam-diam (drop/paste/pilih file sama-sama
+      // lewat sini). Overlay hasil penerapan template otomatis bukan
+      // kerja pengguna (dipakai ulang otomatis) sehingga tidak memicu
+      // konfirmasi — ini mencegah dialog "Ganti PDF?" palsu tepat setelah
+      // upload baru.
+      if (pdfInfo && overlays.length > 0 && userDirtyRef.current) {
         setPendingFile(file);
         return;
       }
