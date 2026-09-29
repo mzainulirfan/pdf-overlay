@@ -676,6 +676,19 @@ export default function PdfEditor() {
 
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
+      // Saat fokus mengetik (input/textarea/konten editable), biarkan
+      // tempelan teks berjalan normal. Tanpa penjagaan ini, Ctrl+V di
+      // kolom teks ikut membajak clipboard berisi file PDF sehingga
+      // dialog "Ganti PDF?" muncul padahal pengguna hanya menempel teks.
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
       let file: File | null = null;
       if (e.clipboardData?.files?.length) {
         for (const f of e.clipboardData.files) {
