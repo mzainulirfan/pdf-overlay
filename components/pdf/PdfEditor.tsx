@@ -495,6 +495,10 @@ export default function PdfEditor() {
   const zoomFit = useCallback(() => setZoom(1), []);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const renderTokenRef = useRef(0);
+  // Generasi buka-file: tiap openPdfFile menaikkan token; penyelesaian
+  // dari generasi lama (mis. paste ganda / pilih file beruntun) wajib
+  // batal dan tidak boleh menimpa dokumen yang lebih baru.
+  const openTokenRef = useRef(0);
 
   useEffect(() => {
     const node = previewContainerRef.current;
@@ -615,17 +619,28 @@ export default function PdfEditor() {
         setError(validation.message);
         return;
       }
+      // Klaim generasi terbaru: load lain yang masih berjalan menjadi basi.
+      // Validasi sengaja di atas agar file tak valid tidak membatalkan
+      // load yang sedang berjalan.
+      const openToken = ++openTokenRef.current;
+      const isStale = () => openToken !== openTokenRef.current;
       const looksLikePdf = isLikelyPdfFile(file);
 
       try {
         const source = await getPdfSource(file);
+        if (isStale()) return;
         // Salinan terpisah untuk export. pdfjs mentransfer buffer ke worker
         // sehingga buffer asli bisa ter-detach.
         setPdfBytes(new Uint8Array(source.slice(0)));
         const loadingTask = await loadPdfDocument(new Uint8Array(source));
+        if (isStale()) {
+          loadingTask.destroy();
+          return;
+        }
+        const prevTask = loadingTaskRef.current;
+        loadingTaskRef.current = loadingTask;
         let doc: PdfjsDoc;
         try {
-          loadingTaskRef.current = loadingTask;
           doc = await loadingTask.promise;
         } catch (loadErr) {
           const message = String(loadErr);
@@ -641,11 +656,16 @@ export default function PdfEditor() {
               : "Format file tidak didukung. Pilih file PDF.",
           );
         }
+        if (isStale()) {
+          loadingTask.destroy();
+          return;
+        }
 
         const pageCheck = validatePageCount(doc.numPages);
         if (!pageCheck.ok) {
           loadingTask.destroy();
-          loadingTaskRef.current = null;
+          if (loadingTaskRef.current === loadingTask)
+            loadingTaskRef.current = null;
           setError(pageCheck.message);
           return;
         }
@@ -663,12 +683,18 @@ export default function PdfEditor() {
           totalPages: doc.numPages,
           currentPage: 1,
         });
+        // Bebaskan worker dokumen lama yang baru digantikan. Dokumen baru
+        // sudah di-set di atas sehingga layar tidak berkedip.
+        if (prevTask && prevTask !== loadingTask) prevTask.destroy();
 
         if (activeTemplateId) {
           const template = templates.find((t) => t.id === activeTemplateId);
           if (template) void applyTemplate(template);
         }
       } catch (err) {
+        // Error dari generasi basi tidak boleh menimpa dokumen yang lebih
+        // baru (atau menakut-nakuti dengan pesan yang sudah kedaluwarsa).
+        if (isStale()) return;
         setError((err as Error)?.message ?? "File tidak dapat diproses.");
       }
     },
@@ -1145,6 +1171,9 @@ export default function PdfEditor() {
   );
 
   const resetToUpload = useCallback(() => {
+    // Batalkan load yang mungkin masih berjalan agar penyelesaiannya
+    // tidak membuka dokumen basi setelah layar kembali ke unggahan.
+    openTokenRef.current += 1;
     loadingTaskRef.current?.destroy();
     loadingTaskRef.current = null;
     setPdfDoc(null);
